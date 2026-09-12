@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, MoreVertical, Phone, Pencil, Trash2, Mail, Shield, ShieldOff, AlertCircle, Euro, Users } from 'lucide-react';
+import { Plus, Search, Phone, Pencil, Trash2, Mail, Shield, ShieldOff, AlertCircle, Euro, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Avatar } from '../../components/shared/Avatar';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
 import { SortSelect } from '../../components/shared/SortSelect';
+import { ActionMenu } from '../../components/shared/ActionMenu';
+import type { ActionMenuItem } from '../../components/shared/ActionMenu';
 import { calculateMonthlyPrice, PER_EMPLOYEE_EUR } from '../../lib/plans';
 import { toLocalDateStr } from '../../lib/utils';
 import type { Employee, Property, EmployeeProperty, Company } from '../../lib/types';
@@ -73,16 +75,6 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [company.id]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      const target = e.target as Element;
-      if (!target.closest('[data-menu]')) setMenuOpen(null);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
 
   async function loadData() {
     try {
@@ -254,6 +246,14 @@ const handleDelete = async (emp: Employee) => {
     );
   };
 
+  const getEmployeeMenuItems = (emp: Employee): ActionMenuItem[] => [
+    { label: 'Bearbeiten', icon: Pencil, onClick: () => openEditModal(emp) },
+    emp.status === 'active'
+      ? { label: 'Als krank melden', tone: 'danger', onClick: () => handleMarkSick(emp) }
+      : { label: 'Krankmeldung beenden', tone: 'success', onClick: () => handleMarkActive(emp) },
+    { label: 'Löschen', icon: Trash2, tone: 'danger', dividerBefore: true, onClick: () => { setDeleteConfirm(emp); setMenuOpen(null); } },
+  ];
+
   const renderEmployeeCard = (emp: Employee) => {
     const knownProps = getKnownProperties(emp.id);
     return (
@@ -269,23 +269,11 @@ const handleDelete = async (emp: Employee) => {
           <div className="flex items-center gap-2 shrink-0">
             {emp.status === 'sick' ? <span className="badge-danger">Krank</span> : <span className="badge-success">Aktiv</span>}
             {emp.user_id ? <Shield size={14} className="text-[#3B82F6]" /> : <ShieldOff size={14} className="text-[#CBD5E1]" />}
-            <div className="relative" data-menu>
-              <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors">
-                <MoreVertical size={16} className="text-[#94A3B8]" />
-              </button>
-              {menuOpen === emp.id && (
-                <div className="absolute right-0 top-9 bg-white rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.08),0_4px_6px_-4px_rgba(0,0,0,0.04)] border border-[#E2E8F0]/60 py-1.5 z-20 min-w-[180px] animate-scale-in">
-                  <button onClick={() => openEditModal(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#0F172A] hover:bg-[#F8FAFC] transition-colors flex items-center gap-2.5"><Pencil size={14} className="text-[#94A3B8]" /> Bearbeiten</button>
-                  {emp.status === 'active' ? (
-                    <button onClick={() => handleMarkSick(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] transition-colors">Als krank melden</button>
-                  ) : (
-                    <button onClick={() => handleMarkActive(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#16A34A] hover:bg-[#F0FDF4] transition-colors">Krankmeldung beenden</button>
-                  )}
-                  <div className="mx-3 my-1 h-px bg-[#F1F5F9]" />
-                  <button onClick={() => { setDeleteConfirm(emp); setMenuOpen(null); }} className="w-full text-left px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] transition-colors flex items-center gap-2.5"><Trash2 size={14} /> Löschen</button>
-                </div>
-              )}
-            </div>
+            <ActionMenu
+              items={getEmployeeMenuItems(emp)}
+              isOpen={menuOpen === emp.id}
+              onOpenChange={open => setMenuOpen(open ? emp.id : null)}
+            />
           </div>
         </div>
         {knownProps.length > 0 && <div className="mt-3">{renderPropertyChipsOverflow(knownProps)}</div>}
@@ -331,23 +319,11 @@ const handleDelete = async (emp: Employee) => {
         </td>
         <td className="px-5 py-4">{renderPropertyChipsOverflow(knownProps)}</td>
         <td className="px-5 py-4">
-          <div className="relative" data-menu>
-            <button onClick={() => setMenuOpen(menuOpen === emp.id ? null : emp.id)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors">
-              <MoreVertical size={16} className="text-[#94A3B8]" />
-            </button>
-            {menuOpen === emp.id && (
-              <div className="absolute right-5 top-10 bg-white rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.08),0_4px_6px_-4px_rgba(0,0,0,0.04)] border border-[#E2E8F0]/60 py-1.5 z-20 min-w-[180px] animate-scale-in">
-                <button onClick={() => openEditModal(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#0F172A] hover:bg-[#F8FAFC] transition-colors flex items-center gap-2.5"><Pencil size={14} className="text-[#94A3B8]" /> Bearbeiten</button>
-                {emp.status === 'active' ? (
-                  <button onClick={() => handleMarkSick(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] transition-colors">Als krank melden</button>
-                ) : (
-                  <button onClick={() => handleMarkActive(emp)} className="w-full text-left px-4 py-2.5 text-sm text-[#16A34A] hover:bg-[#F0FDF4] transition-colors">Krankmeldung beenden</button>
-                )}
-                <div className="mx-3 my-1 h-px bg-[#F1F5F9]" />
-                <button onClick={() => { setDeleteConfirm(emp); setMenuOpen(null); }} className="w-full text-left px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] transition-colors flex items-center gap-2.5"><Trash2 size={14} /> Löschen</button>
-              </div>
-            )}
-          </div>
+          <ActionMenu
+            items={getEmployeeMenuItems(emp)}
+            isOpen={menuOpen === emp.id}
+            onOpenChange={open => setMenuOpen(open ? emp.id : null)}
+          />
         </td>
       </tr>
     );

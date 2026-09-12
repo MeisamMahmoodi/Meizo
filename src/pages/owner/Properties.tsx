@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, MapPin, MoreVertical, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2, Search } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, MapPin, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
 import { AddressAutocomplete } from '../../components/shared/AddressAutocomplete';
 import { SortSelect } from '../../components/shared/SortSelect';
+import { ActionMenu } from '../../components/shared/ActionMenu';
+import type { ActionMenuItem } from '../../components/shared/ActionMenu';
 import type { AddressValue } from '../../components/shared/AddressAutocomplete';
 import type { Property, Company } from '../../lib/types';
 
@@ -32,7 +34,6 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'newest'>('name');
-  const menuRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
 
   const [newName, setNewName] = useState('');
@@ -46,14 +47,6 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [editPrice, setEditPrice] = useState('');
 
   useEffect(() => { loadData(); }, [company.id, refreshKey]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(null);
-    }
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
 
   async function loadData() {
     try {
@@ -153,6 +146,13 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
     return <Icon size={20} className="text-[#334155]" />;
   };
 
+  const getPropertyMenuItems = (prop: Property): ActionMenuItem[] => [
+    { label: 'Bearbeiten', icon: Pencil, onClick: () => openEditModal(prop) },
+    { label: 'Einsatz erstellen', icon: CalendarPlus, tone: 'success', onClick: () => { setMenuOpen(null); onNavigate?.('assignments'); } },
+    { label: 'Kunden-Link kopieren', icon: Link2, tone: 'info', onClick: () => handleCopyCustomerLink(prop) },
+    { label: 'Löschen', icon: Trash2, tone: 'danger', dividerBefore: true, onClick: () => { setDeleteConfirm(prop); setMenuOpen(null); } },
+  ];
+
   const renderTypePicker = (selectedType: string, setter: (v: string) => void) => (
     <div className="flex flex-wrap gap-2">
       {typeOptions.map(opt => (
@@ -214,20 +214,11 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
                     <p className="text-xs text-[#16A34A] font-semibold mt-1 flex items-center gap-1.5"><Euro size={12} /> {prop.monthly_price.toLocaleString('de-DE')} €/Monat</p>
                   )}
                 </div>
-                <div className="relative" ref={menuOpen === prop.id ? menuRef : null}>
-                  <button onClick={() => setMenuOpen(menuOpen === prop.id ? null : prop.id)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors">
-                    <MoreVertical size={16} className="text-[#94A3B8]" />
-                  </button>
-                  {menuOpen === prop.id && (
-                    <div className="absolute right-0 top-9 bg-white rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.08),0_4px_6px_-4px_rgba(0,0,0,0.04)] border border-[#E2E8F0]/60 py-1.5 z-20 min-w-[180px] animate-scale-in">
-                      <button onClick={() => openEditModal(prop)} className="w-full text-left px-4 py-2.5 text-sm text-[#0F172A] hover:bg-[#F8FAFC] transition-colors flex items-center gap-2.5"><Pencil size={14} className="text-[#94A3B8]" /> Bearbeiten</button>
-                      <button onClick={() => { setMenuOpen(null); onNavigate?.('assignments'); }} className="w-full text-left px-4 py-2.5 text-sm text-[#16A34A] hover:bg-[#F0FDF4] transition-colors flex items-center gap-2.5"><CalendarPlus size={14} /> Einsatz erstellen</button>
-                      <button onClick={() => handleCopyCustomerLink(prop)} className="w-full text-left px-4 py-2.5 text-sm text-[#2563EB] hover:bg-[#EFF6FF] transition-colors flex items-center gap-2.5"><Link2 size={14} /> Kunden-Link kopieren</button>
-                      <div className="mx-3 my-1 h-px bg-[#F1F5F9]" />
-                      <button onClick={() => { setDeleteConfirm(prop); setMenuOpen(null); }} className="w-full text-left px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] transition-colors flex items-center gap-2.5"><Trash2 size={14} /> Löschen</button>
-                    </div>
-                  )}
-                </div>
+                <ActionMenu
+                  items={getPropertyMenuItems(prop)}
+                  isOpen={menuOpen === prop.id}
+                  onOpenChange={open => setMenuOpen(open ? prop.id : null)}
+                />
               </div>
             </div>
           );
