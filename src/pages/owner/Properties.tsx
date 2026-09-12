@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, MapPin, MoreVertical, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2 } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, MapPin, MoreVertical, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
@@ -28,6 +28,8 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [editModal, setEditModal] = useState<Property | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const menuRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
 
@@ -120,6 +122,22 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
     setNewName(''); setNewAddress({ formatted: '', lat: null, lng: null }); setNewType('office'); setNewPrice('');
   };
 
+  const filteredProperties = useMemo(() => {
+    let list = properties;
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(s) || p.address.toLowerCase().includes(s));
+    }
+    if (typeFilter !== 'all') list = list.filter(p => p.type === typeFilter);
+    return list;
+  }, [properties, search, typeFilter]);
+
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: properties.length };
+    for (const opt of typeOptions) counts[opt.value] = properties.filter(p => p.type === opt.value).length;
+    return counts;
+  }, [properties]);
+
   const TypeIcon = ({ type }: { type: string }) => {
     const opt = typeOptions.find(o => o.value === type) || typeOptions[4];
     const Icon = opt.icon;
@@ -146,8 +164,23 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
         </button>
       </div>
 
+      <div className="relative mb-5">
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
+        <input type="text" placeholder="Name oder Adresse..." value={search} onChange={e => setSearch(e.target.value)}
+          className="input-field !pl-11" />
+      </div>
+
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {[{ value: 'all', label: 'Alle' }, ...typeOptions].map(opt => (
+          <button key={opt.value} onClick={() => setTypeFilter(opt.value)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${typeFilter === opt.value ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}>
+            {opt.label} {typeCounts[opt.value]}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {properties.map(prop => {
+        {filteredProperties.map(prop => {
           return (
             <div key={prop.id} className="card p-5 relative">
               <div className="flex items-start gap-3.5">
@@ -179,8 +212,8 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
             </div>
           );
         })}
-        {properties.length === 0 && (
-          <div className="col-span-2 card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Objekte vorhanden</p></div>
+        {filteredProperties.length === 0 && (
+          <div className="col-span-2 card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Objekte gefunden</p></div>
         )}
       </div>
 
