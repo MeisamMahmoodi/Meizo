@@ -70,6 +70,8 @@ type TranslationKeys = {
   backToOverview: string;
   back: string;
   login: string;
+  continueWithGoogle: string;
+  orDivider: string;
   email: string;
   password: string;
   invalidCredentials: string;
@@ -155,6 +157,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Zurück zur Übersicht',
     back: 'Zurück',
     login: 'Anmelden',
+    continueWithGoogle: 'Mit Google anmelden',
+    orDivider: 'oder',
     email: 'E-Mail',
     password: 'Passwort',
     invalidCredentials: 'Ungültige Anmeldedaten',
@@ -238,6 +242,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Inapoi la prezentare generala',
     back: 'Inapoi',
     login: 'Autentificare',
+    continueWithGoogle: 'Continua cu Google',
+    orDivider: 'sau',
     email: 'E-mail',
     password: 'Parola',
     invalidCredentials: 'Date de autentificare invalide',
@@ -321,6 +327,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'العودة للرئيسية',
     back: 'رجوع',
     login: 'تسجيل الدخول',
+    continueWithGoogle: 'تسجيل الدخول عبر Google',
+    orDivider: 'أو',
     email: 'البريد الإلكتروني',
     password: 'كلمة المرور',
     invalidCredentials: 'بيانات الدخول غير صحيحة',
@@ -404,6 +412,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Wroc do przegladu',
     back: 'Wroc',
     login: 'Zaloguj sie',
+    continueWithGoogle: 'Zaloguj sie przez Google',
+    orDivider: 'lub',
     email: 'E-mail',
     password: 'Haslo',
     invalidCredentials: 'Nieprawidlowe dane logowania',
@@ -487,6 +497,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Back to overview',
     back: 'Back',
     login: 'Log in',
+    continueWithGoogle: 'Continue with Google',
+    orDivider: 'or',
     email: 'Email',
     password: 'Password',
     invalidCredentials: 'Invalid credentials',
@@ -570,6 +582,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Назад до огляду',
     back: 'Назад',
     login: 'Увійти',
+    continueWithGoogle: 'Увійти через Google',
+    orDivider: 'або',
     email: 'Електронна пошта',
     password: 'Пароль',
     invalidCredentials: 'Невірні дані для входу',
@@ -653,6 +667,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Genel bakışa dön',
     back: 'Geri',
     login: 'Giriş yap',
+    continueWithGoogle: 'Google ile giriş yap',
+    orDivider: 'veya',
     email: 'E-posta',
     password: 'Şifre',
     invalidCredentials: 'Geçersiz giriş bilgileri',
@@ -736,6 +752,8 @@ const translations: Record<Lang, TranslationKeys> = {
     backToOverview: 'Обратно към прегледа',
     back: 'Назад',
     login: 'Вход',
+    continueWithGoogle: 'Влизане с Google',
+    orDivider: 'или',
     email: 'Имейл',
     password: 'Парола',
     invalidCredentials: 'Невалидни данни за вход',
