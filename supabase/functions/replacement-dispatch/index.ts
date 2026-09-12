@@ -17,16 +17,6 @@ const RESPONSE_WINDOW_MINUTES = 5;
 const MAX_WEEKLY_MINUTES = 48 * 60;
 const MIN_REST_MINUTES = 11 * 60;
 
-// Automatischer Ersatz-Dispatch ist ein Business+-Feature (siehe die
-// hasBusiness-Gates in Sidebar.tsx/Dashboard.tsx). Ohne diesen Check würde
-// der Cron firmenübergreifend für ALLE Firmen dispatchen und Starter-Kunden
-// das Feature kostenlos über die Hintertür geben.
-const PLAN_ORDER = ["Starter", "Business", "Premium"];
-function planAllows(contract: string | null | undefined): boolean {
-  const plan = contract ?? "Starter";
-  return PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf("Business");
-}
-
 interface AssignmentRow {
   id: string;
   employee_id: string;
@@ -99,7 +89,7 @@ Deno.serve(async (req: Request) => {
       // Find the sick employee's affected assignment today (not yet handled)
       const { data: affected } = await admin
         .from("assignments")
-        .select("id, employee_id, property_id, date, status, time_from, time_to, property:properties(name, time_from, time_to, company_id, company:companies(contract))")
+        .select("id, employee_id, property_id, date, status, time_from, time_to, property:properties(name, time_from, time_to, company_id)")
         .eq("employee_id", sr.employee_id)
         .eq("date", todayStr)
         .eq("status", "assigned")
@@ -108,10 +98,8 @@ Deno.serve(async (req: Request) => {
 
       if (!affected) continue; // no coverage needed for this sick report today
 
-      const property = affected.property as unknown as { name: string; time_from: string; time_to: string; company_id: string; company: { contract: string } | null } | null;
+      const property = affected.property as unknown as { name: string; time_from: string; time_to: string; company_id: string } | null;
       if (!property) continue;
-
-      if (!planAllows(property.company?.contract)) continue; // Starter-Firmen: kein Auto-Dispatch
 
       // Already resolved?
       const { data: accepted } = await admin
