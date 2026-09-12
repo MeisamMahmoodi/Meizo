@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LangProvider, useLang } from './hooks/useLang';
 import { ToastProvider } from './components/shared/Toast';
@@ -210,7 +210,7 @@ function AccountSuspendedScreen() {
 
 function LandingPage() {
   const isPwa = window.matchMedia('(display-mode: standalone)').matches
-    || (window.navigator as any).standalone === true;
+    || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
   if (isPwa) {
     return <UnifiedLogin />;
@@ -277,12 +277,14 @@ function AppRoutes() {
 
     const timeout = setTimeout(() => setRoleLoading(false), 3000);
 
-    supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', uid)
-      .maybeSingle()
-      .then(async ({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', uid)
+          .maybeSingle();
+
         if (data?.role === 'owner' || data?.role === 'employee' || data?.role === 'admin') {
           setRole(data.role);
           if (data.role === 'owner') {
@@ -298,12 +300,15 @@ function AppRoutes() {
           setRole(null);
           setCompanyId(null);
         }
-      })
-      .catch(() => { setRole(null); setCompanyId(null); setOwnerCompany(undefined); })
-      .finally(() => {
+      } catch {
+        setRole(null);
+        setCompanyId(null);
+        setOwnerCompany(undefined);
+      } finally {
         clearTimeout(timeout);
         setRoleLoading(false);
-      });
+      }
+    })();
 
     return () => clearTimeout(timeout);
   }, [user]);

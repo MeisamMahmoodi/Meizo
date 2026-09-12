@@ -33,7 +33,7 @@ export const langFlags: Record<Lang, string> = {
   bg: '🇧🇬',
 };
 
-type TranslationKeys = {
+export type TranslationKeys = {
   goodMorning: string;
   goodDay: string;
   goodEvening: string;

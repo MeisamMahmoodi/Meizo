@@ -361,7 +361,7 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
       <div class="sig-label">Unterschrift Geschäftsführer</div>
     </div>
   </div>
-  <script>window.onload = () => { window.print(); };<\/script>
+  <script>window.onload = () => { window.print(); };</script>
 </body>
 </html>`;
 

@@ -24,7 +24,6 @@ function minutesToLabel(min: number): string {
 
 export function Controlling({ company, refreshKey }: ControllingProps) {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [monthAssignments, setMonthAssignments] = useState<AssignmentWithDetails[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -40,14 +39,12 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
       const lastDay = new Date(year, month, 0).getDate();
       const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      const [propRes, empRes, assignRes] = await Promise.all([
+      const [propRes, assignRes] = await Promise.all([
         supabase.from('properties').select('*').eq('company_id', company.id).order('name'),
-        supabase.from('employees').select('*').eq('company_id', company.id),
         supabase.from('assignments').select('*, employee:employees(*), property:properties(*)').gte('date', monthStart).lte('date', monthEnd),
       ]);
 
       setProperties(propRes.data || []);
-      setEmployees(empRes.data || []);
       setMonthAssignments((assignRes.data as unknown as AssignmentWithDetails[]) || []);
     } catch {
       // Component renders with existing state
@@ -57,8 +54,6 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
   const [selYear, selMonth] = selectedMonth.split('-').map(Number);
   const today = new Date();
   const isCurrentMonth = selYear === today.getFullYear() && selMonth === today.getMonth() + 1;
-  const daysInMonth = new Date(selYear, selMonth, 0).getDate();
-  const daysPassed = isCurrentMonth ? today.getDate() : daysInMonth;
 
   const changeMonth = (delta: number) => {
     const d = new Date(selYear, selMonth - 1 + delta, 1);

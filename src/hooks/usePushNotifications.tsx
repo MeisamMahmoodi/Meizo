@@ -129,10 +129,9 @@ export async function sendPushToEmployee(
 ): Promise<boolean> {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
     const { data: { session } } = await supabase.auth.getSession();
-const token = session?.access_token;
-if (!token) return false;
+    const token = session?.access_token;
+    if (!token) return false;
 
     const res = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
       method: 'POST',
@@ -143,8 +142,7 @@ if (!token) return false;
       body: JSON.stringify({ employee_id: employeeId, title, body, data }),
     });
     const json = await res.json();
-    console.log('Push response:', json);
-return json.ok === true;
+    return json.ok === true;
   } catch {
     return false;
   }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { Lang } from '../lib/i18n';
+import type { Lang, TranslationKeys } from '../lib/i18n';
 import { t as translate, isRTL } from '../lib/i18n';
 
 interface LangContextType {
@@ -25,7 +25,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LANG_KEY, newLang);
   };
 
-  const t = (key: string): string => translate(lang, key as any);
+  const t = (key: string): string => translate(lang, key as keyof TranslationKeys);
 
   const rtl = isRTL(lang);
 

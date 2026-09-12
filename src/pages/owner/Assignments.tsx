@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { DragEvent } from 'react';
+import type { DragEvent, Dispatch, SetStateAction } from 'react';
 import { Plus, Calendar, MapPin, Clock, Check, X, AlertTriangle, ChevronLeft, ChevronRight, Trash2, Repeat, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
@@ -98,7 +98,7 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
         return sr.date <= selectedDate && selectedDate <= end;
       });
       setSickReports(filtered);
-      setReplacementRequests((rrRes.data || []) as typeof replacementRequests);
+      setReplacementRequests((rrRes.data || []) as unknown as typeof replacementRequests);
     } catch {
       // Component renders with existing state
     }
@@ -796,7 +796,7 @@ interface WeekGridProps {
   isEmployeeSickOnDate: (employeeId: string, date: string) => boolean;
   onDropAssignment: (assignmentId: string, newEmployeeId: string, newDate: string) => void;
   dragOverCell: string | null;
-  setDragOverCell: (cell: string | null) => void;
+  setDragOverCell: Dispatch<SetStateAction<string | null>>;
 }
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];

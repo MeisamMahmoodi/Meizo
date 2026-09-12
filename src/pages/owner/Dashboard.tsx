@@ -124,7 +124,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
       });
       setSickReports(filtered);
       setEmployeeProperties(epRes.data || []);
-      setReplacementRequests((rrRes.data || []) as typeof replacementRequests);
+      setReplacementRequests((rrRes.data || []) as unknown as typeof replacementRequests);
     } catch {
       // Component renders with existing state
     } finally {
@@ -133,7 +133,6 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
   }
 
   const companyEmployees = useMemo(() => employees.filter(e => e.company_id === company.id), [employees, company.id]);
-  const sickEmployees = useMemo(() => companyEmployees.filter(e => e.status === 'sick'), [companyEmployees]);
   const activeEmployees = useMemo(() => companyEmployees.filter(e => e.status === 'active'), [companyEmployees]);
   const todayAssignments = useMemo(() => assignments.filter(a => a.property?.company_id === company.id), [assignments, company.id]);
   const sickReportsForCompany = useMemo(() => sickReports.filter(sr => sr.employee?.company_id === company.id), [sickReports, company.id]);
@@ -198,12 +197,6 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
     });
     return Object.values(groups);
   }, [todayAssignments, replacementAssignmentIds]);
-
-  const getPropertyAssignments = (propertyId: string) =>
-    todayAssignments.filter(a => a.property_id === propertyId && a.status !== 'cancelled');
-
-  const hasSickEmployeeForProperty = (propertyId: string) =>
-    sickReportsForCompany.some(sr => todayAssignments.some(a => a.employee_id === sr.employee_id && a.property_id === propertyId));
 
   const handleFindReplacement = (sickReport: SickReportWithEmployee) => {
     const affectedAssignment = todayAssignments.find(a => a.employee_id === sickReport.employee_id);

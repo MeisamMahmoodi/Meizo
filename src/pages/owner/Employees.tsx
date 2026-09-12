@@ -203,7 +203,7 @@ const handleDelete = async (emp: Employee) => {
   await supabase.from('sick_reports').delete().eq('employee_id', emp.id);
   await supabase.from('assignments').delete().eq('employee_id', emp.id);
   await supabase.from('replacement_requests').delete().eq('replacement_employee_id', emp.id);
-  const { error: _e1 } = await supabase.from('employee_properties').delete().eq('employee_id', emp.id);
+  await supabase.from('employee_properties').delete().eq('employee_id', emp.id);
   const { error: e2 } = await supabase.from('employees').delete().eq('id', emp.id);
   if (e2) { addToast('Fehler beim Löschen', 'error'); return; }
   setDeleteConfirm(null); setMenuOpen(null); onRefresh(); addToast('Mitarbeiter gelöscht');
