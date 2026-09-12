@@ -3,8 +3,6 @@ import type { ReactNode } from 'react';
 import { Check, MapPin, Clock, Users, MessageCircle, Globe2, Shield, FileText } from 'lucide-react';
 import { BASE_FEE_EUR, PER_EMPLOYEE_EUR, calculateMonthlyPrice } from '../lib/plans';
 
-const CALENDLY = 'https://calendly.com/meisam-meizo/30min';
-
 /* ---------- Shared building blocks ---------- */
 
 function RevealOnScroll({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -75,12 +73,10 @@ function Nav() {
             Anmelden
           </a>
           <a
-            href={CALENDLY}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/register"
             className="text-sm font-bold text-white bg-[#16A34A] px-4 py-2 rounded-lg hover:bg-[#15803D] transition-colors shadow-sm"
           >
-            Termin buchen →
+            Kostenloses Konto erstellen →
           </a>
         </div>
       </div>
@@ -132,8 +128,8 @@ function Hero() {
           Statt WhatsApp-Rundruf und Durchtelefonieren sucht meizo automatisch einen Ersatz per App-Benachrichtigung — während Sie noch Ihren Kaffee trinken.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <a href={CALENDLY} target="_blank" rel="noopener noreferrer" className="bg-[#0F172A] text-white font-bold px-6 py-3.5 rounded-2xl hover:bg-[#1E293B] transition-colors shadow-sm">
-            Gratis Termin buchen →
+          <a href="/register" className="bg-[#0F172A] text-white font-bold px-6 py-3.5 rounded-2xl hover:bg-[#1E293B] transition-colors shadow-sm">
+            Kostenloses Konto erstellen und testen →
           </a>
           <a href="/pricing" className="bg-white text-[#0F172A] font-bold px-6 py-3.5 rounded-2xl border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
             Preis berechnen
@@ -701,8 +697,8 @@ function FinalCta() {
       <h2 className="text-3xl sm:text-4xl font-bold text-[#0F172A] tracking-tight mb-4">Nie wieder 06:47-Uhr-Panik.</h2>
       <p className="text-[#64748B] mb-8 max-w-md mx-auto">Erster Monat kostenlos, keine Kreditkarte, keine Vertragsbindung.</p>
       <div className="flex flex-wrap gap-3 justify-center">
-        <a href={CALENDLY} target="_blank" rel="noopener noreferrer" className="bg-[#16A34A] text-white font-bold px-7 py-3.5 rounded-2xl hover:bg-[#15803D] transition-colors shadow-sm">
-          Gratis Termin buchen →
+        <a href="/register" className="bg-[#16A34A] text-white font-bold px-7 py-3.5 rounded-2xl hover:bg-[#15803D] transition-colors shadow-sm">
+          Kostenloses Konto erstellen und testen →
         </a>
         <a href="mailto:meisam@meizo.de?subject=Meizo%20Anfrage" className="bg-white text-[#0F172A] font-bold px-7 py-3.5 rounded-2xl border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
           meisam@meizo.de

@@ -9,7 +9,8 @@ interface AuthContextType {
   mustChangePassword: boolean;
   passwordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, companyName: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<{ error: string | null }>;
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
@@ -75,8 +76,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  const signUp = async (email: string, password: string, companyName: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { pending_company_name: companyName },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    return { error: error?.message ?? null };
+  };
+
+  // Self-service Google login/signup. First-time users land back here with
+  // a session but no profile yet — AppRoutes picks that up and finishes
+  // the signup (asking for a company name, since Google doesn't provide one).
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
     return { error: error?.message ?? null };
   };
 
@@ -117,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, mustChangePassword, passwordRecovery, signIn, signUp, signOut, changePassword, requestPasswordReset }}>
+    <AuthContext.Provider value={{ user, session, loading, mustChangePassword, passwordRecovery, signIn, signUp, signInWithGoogle, signOut, changePassword, requestPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );

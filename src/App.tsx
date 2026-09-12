@@ -26,6 +26,7 @@ import { Pricing } from './pages/Pricing';
 import { Landing } from './pages/Landing';
 import { PaywallModal } from './components/shared/PaywallModal';
 import { CustomerPortal } from './pages/CustomerPortal';
+import { Register } from './pages/Register';
 
 function OwnerApp({ company }: { company: Company & { paid_until: string | null } }) {
   const [page, setPage] = useState('dashboard');
@@ -329,6 +330,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<UnifiedLogin />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/pricing" element={<PricingGate />} />
         <Route path="/impressum" element={<PublicLegalPage><Impressum /></PublicLegalPage>} />
         <Route path="/datenschutz" element={<PublicLegalPage><Datenschutz /></PublicLegalPage>} />
@@ -375,10 +377,100 @@ function AppRoutes() {
     );
   }
 
+  return <NoProfileScreen user={user} signOut={signOut} />;
+}
+
+// Shown when someone is authenticated but has no profiles row yet. Covers
+// two very different cases:
+// 1. A fresh self-signup finishing its first visit — either an email/
+//    password account with pending_company_name in its metadata (set by
+//    Register.tsx at signUp time), or a first-time Google login (Google is
+//    only ever reached via the "Mit Google registrieren" button, so any
+//    Google-authenticated session without a profile is by definition new).
+// 2. A genuinely orphaned account (e.g. an employee whose profile got
+//    deleted) — falls back to the original error message.
+function NoProfileScreen({ user, signOut }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; signOut: () => Promise<void> }) {
+  const pendingCompanyName = (user.user_metadata?.pending_company_name as string | undefined)?.trim();
+  const isFreshGoogleLogin = !pendingCompanyName && user.app_metadata?.provider === 'google';
+
+  const [companyName, setCompanyName] = useState(pendingCompanyName ?? '');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(!!pendingCompanyName);
+  const [failed, setFailed] = useState(false);
+
+  const completeSignup = async (name: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-signup`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ company_name: name }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Fehler beim Einrichten');
+      window.location.reload();
+    } catch (err) {
+      setLoading(false);
+      setFailed(true);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  useEffect(() => {
+    if (pendingCompanyName) completeSignup(pendingCompanyName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (pendingCompanyName && !failed) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-ink-900 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isFreshGoogleLogin && !failed) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-6">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <img src="/meizoLogoMarkDark.png" alt="Meizo" className="h-11 w-auto mx-auto mb-5" />
+            <h1 className="text-xl font-bold text-ink-900 tracking-tight">Fast geschafft</h1>
+            <p className="text-ink-500 text-sm mt-1.5">Wie heißt deine Firma?</p>
+          </div>
+          <form onSubmit={e => { e.preventDefault(); if (companyName.trim()) completeSignup(companyName.trim()); }} className="space-y-4">
+            <input
+              type="text"
+              placeholder="Firmenname"
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+              className="input-field"
+              autoFocus
+            />
+            {error && <p className="text-sm text-danger-500 text-center font-medium">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !companyName.trim()}
+              className="w-full py-3 rounded-xl text-sm font-semibold bg-ink-900 text-white hover:bg-ink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Wird erstellt...' : 'Konto erstellen'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface-50 flex items-center justify-center px-6">
       <div className="text-center space-y-4">
-        <p className="text-ink-500 text-sm">Kein Profil gefunden. Bitte wenden Sie sich an den Administrator.</p>
+        <p className="text-ink-500 text-sm">
+          {failed ? error : 'Kein Profil gefunden. Bitte wenden Sie sich an den Administrator.'}
+        </p>
         <button
           onClick={signOut}
           className="btn-primary"
