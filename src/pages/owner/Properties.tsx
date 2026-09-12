@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
 import { AddressAutocomplete } from '../../components/shared/AddressAutocomplete';
+import { SortSelect } from '../../components/shared/SortSelect';
 import type { AddressValue } from '../../components/shared/AddressAutocomplete';
 import type { Property, Company } from '../../lib/types';
 
@@ -30,6 +31,7 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'newest'>('name');
   const menuRef = useRef<HTMLDivElement>(null);
   const { addToast } = useToast();
 
@@ -129,8 +131,15 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
       list = list.filter(p => p.name.toLowerCase().includes(s) || p.address.toLowerCase().includes(s));
     }
     if (typeFilter !== 'all') list = list.filter(p => p.type === typeFilter);
+
+    list = list.slice().sort((a, b) => {
+      if (sortBy === 'price') return (b.monthly_price ?? -1) - (a.monthly_price ?? -1);
+      if (sortBy === 'newest') return b.created_at.localeCompare(a.created_at);
+      return a.name.localeCompare(b.name, 'de');
+    });
+
     return list;
-  }, [properties, search, typeFilter]);
+  }, [properties, search, typeFilter, sortBy]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: properties.length };
@@ -170,13 +179,24 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
           className="input-field !pl-11" />
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-        {[{ value: 'all', label: 'Alle' }, ...typeOptions].map(opt => (
-          <button key={opt.value} onClick={() => setTypeFilter(opt.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${typeFilter === opt.value ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}>
-            {opt.label} {typeCounts[opt.value]}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-2 mb-6">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {[{ value: 'all', label: 'Alle' }, ...typeOptions].map(opt => (
+            <button key={opt.value} onClick={() => setTypeFilter(opt.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${typeFilter === opt.value ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}>
+              {opt.label} {typeCounts[opt.value]}
+            </button>
+          ))}
+        </div>
+        <SortSelect
+          value={sortBy}
+          onChange={v => setSortBy(v as typeof sortBy)}
+          options={[
+            { value: 'name', label: 'Name (A-Z)' },
+            { value: 'price', label: 'Preis' },
+            { value: 'newest', label: 'Neueste zuerst' },
+          ]}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

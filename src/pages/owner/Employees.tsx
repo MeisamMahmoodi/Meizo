@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Avatar } from '../../components/shared/Avatar';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
+import { SortSelect } from '../../components/shared/SortSelect';
 import { calculateMonthlyPrice, PER_EMPLOYEE_EUR } from '../../lib/plans';
 import { toLocalDateStr } from '../../lib/utils';
 import type { Employee, Property, EmployeeProperty, Company } from '../../lib/types';
@@ -20,6 +21,7 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [employeeProperties, setEmployeeProperties] = useState<EmployeeProperty[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'sick'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'wage' | 'newest'>('name');
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Employee | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -110,8 +112,15 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
     }
     if (filter === 'active') list = list.filter(e => e.status === 'active');
     if (filter === 'sick') list = list.filter(e => e.status === 'sick');
+
+    list = list.slice().sort((a, b) => {
+      if (sortBy === 'wage') return (b.hourly_wage ?? -1) - (a.hourly_wage ?? -1);
+      if (sortBy === 'newest') return b.created_at.localeCompare(a.created_at);
+      return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`, 'de');
+    });
+
     return list;
-  }, [employees, search, filter]);
+  }, [employees, search, filter, sortBy]);
 
   const handleAddEmployee = async () => {
     if (!newFirst || !newLast) return;
@@ -368,17 +377,28 @@ const handleDelete = async (emp: Employee) => {
           className="input-field !pl-11" />
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-        {[
-          { key: 'all', label: `Alle ${counts.all}` },
-          { key: 'active', label: `Aktiv ${counts.active}` },
-          { key: 'sick', label: `Krank ${counts.sick}` },
-        ].map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key as typeof filter)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${filter === f.key ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-2 mb-6">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {[
+            { key: 'all', label: `Alle ${counts.all}` },
+            { key: 'active', label: `Aktiv ${counts.active}` },
+            { key: 'sick', label: `Krank ${counts.sick}` },
+          ].map(f => (
+            <button key={f.key} onClick={() => setFilter(f.key as typeof filter)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${filter === f.key ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <SortSelect
+          value={sortBy}
+          onChange={v => setSortBy(v as typeof sortBy)}
+          options={[
+            { value: 'name', label: 'Name (A-Z)' },
+            { value: 'wage', label: 'Stundenlohn' },
+            { value: 'newest', label: 'Neueste zuerst' },
+          ]}
+        />
       </div>
 
       <div className="lg:hidden space-y-3">
