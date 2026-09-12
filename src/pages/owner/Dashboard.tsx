@@ -372,31 +372,46 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
                   </div>
                 </div>
                 {!hasReplacement && (() => {
-                  const pendingAuto = replacementRequests.find(
-                    rr => rr.sick_report_id === sr.id && rr.status === 'pending' && rr.expires_at
+                  const pending = replacementRequests.find(
+                    rr => rr.sick_report_id === sr.id && rr.status === 'pending'
                   );
-                  if (pendingAuto) {
-                    const expired = new Date(pendingAuto.expires_at as string).getTime() <= nowTick;
+                  if (pending && pending.expires_at) {
+                    const expired = new Date(pending.expires_at).getTime() <= nowTick;
                     return (
                       <div className="mt-5 bg-white/70 border border-[#FECACA]/60 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-sm text-[#0F172A]">
                           <Search size={14} className="text-[#F97316] shrink-0" />
                           <span className="font-semibold">
-                            {pendingAuto.replacement_employee?.first_name} {pendingAuto.replacement_employee?.last_name}
+                            {pending.replacement_employee?.first_name} {pending.replacement_employee?.last_name}
                           </span>
                           <span className="text-[#64748B]">wird automatisch angefragt</span>
                         </div>
                         <div className="flex items-center gap-1.5 mt-2 text-xs text-[#94A3B8]">
                           <AlarmClock size={13} />
-                          {expired ? 'Wartet auf nächste Anfrage…' : <>Antwort erwartet in <span className="font-semibold text-[#F97316]">{formatCountdown(pendingAuto.expires_at as string)}</span> Min</>}
+                          {expired ? 'Wartet auf nächste Anfrage…' : <>Antwort erwartet in <span className="font-semibold text-[#F97316]">{formatCountdown(pending.expires_at)}</span> Min</>}
                         </div>
                         <button
-                          onClick={() => handleSkipCandidate(pendingAuto.id)}
-                          disabled={skippingId === pendingAuto.id}
+                          onClick={() => handleSkipCandidate(pending.id)}
+                          disabled={skippingId === pending.id}
                           className="w-full mt-3 py-2 rounded-xl text-xs font-semibold text-[#64748B] bg-white hover:bg-[#F8FAFC] border border-[#E2E8F0] transition-colors disabled:opacity-50"
                         >
-                          {skippingId === pendingAuto.id ? 'Wird übersprungen…' : 'Überspringen — nächsten Kandidaten fragen'}
+                          {skippingId === pending.id ? 'Wird übersprungen…' : 'Überspringen — nächsten Kandidaten fragen'}
                         </button>
+                      </div>
+                    );
+                  }
+                  if (pending) {
+                    // Manuell gesendete Anfrage ohne Ablaufzeit — es gibt keine
+                    // Eskalationskette, daher nur ein Wartehinweis ohne Countdown/Skip.
+                    return (
+                      <div className="mt-5 bg-white/70 border border-[#FECACA]/60 rounded-xl p-4">
+                        <div className="flex items-center gap-2 text-sm text-[#0F172A]">
+                          <Clock size={14} className="text-[#F97316] shrink-0" />
+                          <span className="font-semibold">
+                            {pending.replacement_employee?.first_name} {pending.replacement_employee?.last_name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#94A3B8] mt-2">Warten auf Bestätigung des Mitarbeiters …</p>
                       </div>
                     );
                   }

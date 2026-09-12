@@ -28,6 +28,9 @@ export interface Company {
   datev_beraternummer: string | null;
   datev_mandantennummer: string | null;
   datev_lohnart_stunden: string | null;
+  // Owner opt-in: wenn true, fragt die replacement-dispatch Cron-Funktion bei
+  // Krankmeldungen automatisch verfügbare Mitarbeiter an. Default false.
+  auto_dispatch_enabled: boolean;
 }
 
 export interface Employee {

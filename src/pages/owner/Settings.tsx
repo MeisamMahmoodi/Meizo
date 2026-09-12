@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lock, Eye, EyeOff, Package, Users, FileSpreadsheet } from 'lucide-react';
+import { Lock, Eye, EyeOff, Package, Users, FileSpreadsheet, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/shared/Toast';
 import { calculateMonthlyPrice } from '../../lib/plans';
@@ -26,6 +26,9 @@ export function Settings({ company, onRefresh }: SettingsProps) {
   const [mandantennummer, setMandantennummer] = useState(company.datev_mandantennummer || '');
   const [lohnartStunden, setLohnartStunden] = useState(company.datev_lohnart_stunden || '');
   const [savingDatev, setSavingDatev] = useState(false);
+
+  const [autoDispatchEnabled, setAutoDispatchEnabled] = useState(company.auto_dispatch_enabled);
+  const [savingAutoDispatch, setSavingAutoDispatch] = useState(false);
 
   const { addToast } = useToast();
 
@@ -68,6 +71,24 @@ export function Settings({ company, onRefresh }: SettingsProps) {
       addToast('Fehler beim Speichern', 'error');
     } else {
       addToast('DATEV-Angaben gespeichert');
+      onRefresh();
+    }
+  };
+
+  const handleToggleAutoDispatch = async (next: boolean) => {
+    setAutoDispatchEnabled(next);
+    setSavingAutoDispatch(true);
+    const { error } = await supabase
+      .from('companies')
+      .update({ auto_dispatch_enabled: next })
+      .eq('id', company.id);
+
+    setSavingAutoDispatch(false);
+    if (error) {
+      setAutoDispatchEnabled(!next);
+      addToast('Fehler beim Speichern', 'error');
+    } else {
+      addToast(next ? 'Automatische Ersatzsuche aktiviert' : 'Automatische Ersatzsuche deaktiviert');
       onRefresh();
     }
   };
@@ -152,6 +173,28 @@ export function Settings({ company, onRefresh }: SettingsProps) {
           >
             {saving ? 'Speichern...' : 'Speichern'}
           </button>
+        </div>
+
+        {/* Automatische Ersatzsuche */}
+        <div className="card p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="text-base font-semibold text-ink-900 flex items-center gap-2.5">
+              <Search size={18} className="text-ink-500" /> Automatische Ersatzsuche
+            </h2>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoDispatchEnabled}
+              disabled={savingAutoDispatch}
+              onClick={() => handleToggleAutoDispatch(!autoDispatchEnabled)}
+              className={`shrink-0 w-11 h-6 rounded-full transition-colors relative disabled:opacity-50 ${autoDispatchEnabled ? 'bg-brand-500' : 'bg-surface-200'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${autoDispatchEnabled ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+          <p className="text-sm text-ink-500 mt-3 leading-relaxed">
+            Wenn aktiviert, fragt meizo bei einer Krankmeldung automatisch verfügbare Mitarbeiter nacheinander an, bevorzugt werden Mitarbeiter, die das Objekt schon kennen, und wer in den letzten 30 Tagen am seltensten gefragt wurde. Jeder Kandidat hat 5 Minuten Zeit zu antworten, danach wird automatisch der nächste gefragt. Ist es aus, musst du Ersatz weiterhin manuell über "Ersatz finden" anfragen.
+          </p>
         </div>
 
         {/* DATEV Export */}
