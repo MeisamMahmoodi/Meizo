@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Clock, Check, CalendarDays, MapPin, Camera, Image, Navigation, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Clock, Check, CalendarDays, MapPin, Camera, Image, Navigation, FileText, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Avatar } from '../../components/shared/Avatar';
 import { Modal } from '../../components/shared/Modal';
@@ -21,6 +21,7 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => toLocalDateStr(new Date()));
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; label: string } | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedDate]);
 
@@ -48,8 +49,19 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
     setSelectedDate(toLocalDateStr(d));
   };
 
-  const withTimestamps = assignments.filter(a => a.checked_in_at || a.completed_at);
-  const withoutTimestamps = assignments.filter(a => !a.checked_in_at && !a.completed_at && a.status !== 'cancelled');
+  // Nur die Listen werden durchsucht — die Statistik-Kacheln oben zeigen
+  // weiterhin den ganzen Tag, damit sie beim Suchen nicht "springen".
+  const filteredAssignments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return assignments;
+    return assignments.filter(a =>
+      `${a.employee?.first_name ?? ''} ${a.employee?.last_name ?? ''}`.toLowerCase().includes(q) ||
+      (a.property?.name ?? '').toLowerCase().includes(q)
+    );
+  }, [assignments, search]);
+
+  const withTimestamps = filteredAssignments.filter(a => a.checked_in_at || a.completed_at);
+  const withoutTimestamps = filteredAssignments.filter(a => !a.checked_in_at && !a.completed_at && a.status !== 'cancelled');
 
   const checkedInCount = assignments.filter(a => a.status === 'checked_in').length;
   const completedCount = assignments.filter(a => a.status === 'completed').length;
@@ -217,6 +229,18 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="relative mb-6 max-w-sm">
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Mitarbeiter oder Objekt suchen..."
+          className="input-field !pl-11"
+        />
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="card p-5">
@@ -255,6 +279,11 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
         <div className="card p-12 text-center">
           <CalendarDays size={40} className="text-[#CBD5E1] mx-auto mb-4" />
           <p className="text-sm text-[#94A3B8]">Keine Einsaetze fuer diesen Tag</p>
+        </div>
+      ) : filteredAssignments.length === 0 ? (
+        <div className="card p-12 text-center">
+          <CalendarDays size={40} className="text-[#CBD5E1] mx-auto mb-4" />
+          <p className="text-sm text-[#94A3B8]">Keine Einsaetze, die zur Suche passen</p>
         </div>
       ) : (
         <div className="space-y-6">

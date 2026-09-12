@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Euro, TrendingUp, TrendingDown, Minus, Clock, Check, CalendarDays, AlertCircle, Pencil, X, Download } from 'lucide-react';
+import { Euro, TrendingUp, TrendingDown, Minus, Clock, Check, CalendarDays, AlertCircle, Pencil, X, Download, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Avatar } from '../../components/shared/Avatar';
 import { Modal } from '../../components/shared/Modal';
@@ -32,6 +32,7 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const [editingWageId, setEditingWageId] = useState<string | null>(null);
   const [editingWageValue, setEditingWageValue] = useState('');
+  const [search, setSearch] = useState('');
   const { addToast } = useToast();
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedMonth]);
@@ -147,6 +148,17 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
 
     return { results, totalMonthlyCost, totalWorkedHours, totalExpectedHours, daysInMonth, daysPassed };
   }, [employees, monthAssignments, employeeProperties, properties, selYear, selMonth, daysPassed, daysInMonth]);
+
+  // Nur die angezeigte Liste wird durchsucht — die Summenkarten und der
+  // Gesamt-Footer bleiben unverändert, damit die Kostenübersicht beim Suchen
+  // nicht "springt".
+  const filteredResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return payrollData.results;
+    return payrollData.results.filter(r =>
+      `${r.employee.first_name} ${r.employee.last_name}`.toLowerCase().includes(q)
+    );
+  }, [payrollData.results, search]);
 
   const handleSetDefaultWage = async () => {
     const wage = parseFloat(defaultWage);
@@ -531,6 +543,18 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="relative mb-6 max-w-sm">
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Mitarbeiter suchen..."
+          className="input-field !pl-11"
+        />
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="card p-5 sm:p-6">
@@ -577,7 +601,7 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
 
       {/* Employee Payroll List */}
       <div className="space-y-3">
-        {payrollData.results.map(({ employee, worked, expected, diff, wage, monthlyEarnings, assignments }) => {
+        {filteredResults.map(({ employee, worked, expected, diff, wage, monthlyEarnings, assignments }) => {
           const workedH = worked / 60;
           const expectedH = expected / 60;
           const diffH = diff / 60;
@@ -743,10 +767,12 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
           );
         })}
 
-        {payrollData.results.length === 0 && (
+        {filteredResults.length === 0 && (
           <div className="card p-10 text-center">
             <AlertCircle size={36} className="text-[#CBD5E1] mx-auto mb-3" />
-            <p className="text-sm text-[#94A3B8]">Keine Mitarbeiter gefunden</p>
+            <p className="text-sm text-[#94A3B8]">
+              {payrollData.results.length === 0 ? 'Keine Mitarbeiter gefunden' : 'Keine Mitarbeiter gefunden, die zur Suche passen'}
+            </p>
           </div>
         )}
       </div>
