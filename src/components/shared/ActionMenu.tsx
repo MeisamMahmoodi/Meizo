@@ -22,6 +22,8 @@ interface ActionMenuProps {
   onOpenChange: (open: boolean) => void;
   /** Bevorzugte Ausrichtung, solange genug Platz da ist (Standard: rechtsbündig). */
   align?: 'left' | 'right';
+  /** Aria-Label für den "..."-Button (Screenreader). */
+  ariaLabel?: string;
 }
 
 const toneClasses: Record<NonNullable<ActionMenuItem['tone']>, string> = {
@@ -40,7 +42,7 @@ const toneClasses: Record<NonNullable<ActionMenuItem['tone']>, string> = {
 // oder seitlich am Bildschirmrand keinen Platz mehr hat, und klappt dann
 // automatisch nach oben bzw. zur anderen Seite auf, statt abgeschnitten zu
 // werden (z. B. bei den letzten Karten einer langen Liste).
-export function ActionMenu({ items, isOpen, onOpenChange, align = 'right' }: ActionMenuProps) {
+export function ActionMenu({ items, isOpen, onOpenChange, align = 'right', ariaLabel = 'Weitere Aktionen' }: ActionMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<{ vertical: 'down' | 'up'; horizontal: 'left' | 'right' }>({
@@ -89,6 +91,7 @@ export function ActionMenu({ items, isOpen, onOpenChange, align = 'right' }: Act
       <button
         type="button"
         onClick={() => onOpenChange(!isOpen)}
+        aria-label={ariaLabel}
         className="p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors"
       >
         <MoreVertical size={16} className="text-[#94A3B8]" />

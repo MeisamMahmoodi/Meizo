@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { Avatar } from '../../components/shared/Avatar';
 import { useToast } from '../../components/shared/Toast';
+import { RemoveAssignmentModal } from '../../components/owner/RemoveAssignmentModal';
 import { formatTime, getDayAbbrev, toLocalDateStr } from '../../lib/utils';
 import { sendPushToEmployee } from '../../hooks/usePushNotifications';
 import type { Employee, Property, Assignment, Company, SickReport } from '../../lib/types';
@@ -358,7 +359,8 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
     if (status === 'checked_in') updates.checked_in_at = new Date().toISOString();
     if (status === 'completed') updates.completed_at = new Date().toISOString();
     const { error } = await supabase.from('assignments').update(updates).eq('id', assignment.id);
-    if (!error) onRefresh();
+    if (error) { addToast('Fehler beim Aktualisieren', 'error'); return; }
+    onRefresh();
   };
 
   const toggleEmployee = (empId: string) => {
@@ -768,21 +770,7 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
       </Modal>
 
       {/* Remove Confirmation */}
-      <Modal open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} width="max-w-sm">
-        <div className="p-8">
-          <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] flex items-center justify-center mb-5">
-            <AlertTriangle size={22} className="text-[#EF4444]" />
-          </div>
-          <h2 className="text-lg font-bold text-[#0F172A] mb-2">Zuweisung entfernen?</h2>
-          <p className="text-sm text-[#64748B] leading-relaxed mb-8">
-            {removeConfirm && `${removeConfirm.employee.first_name} ${removeConfirm.employee.last_name} wird von ${removeConfirm.property.name} am ${new Date(removeConfirm.date).toLocaleDateString('de-DE')} entfernt.`}
-          </p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setRemoveConfirm(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={() => removeConfirm && handleRemoveAssignment(removeConfirm)} className="btn-danger">Entfernen</button>
-          </div>
-        </div>
-      </Modal>
+      <RemoveAssignmentModal assignment={removeConfirm} onClose={() => setRemoveConfirm(null)} onConfirm={handleRemoveAssignment} />
     </div>
   );
 }
@@ -804,6 +792,14 @@ const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 function WeekGrid({ weekDates, employees, weekAssignments, isEmployeeSickOnDate, onDropAssignment, dragOverCell, setDragOverCell }: WeekGridProps) {
   const todayStr = toLocalDateStr(new Date());
 
+  // Fallback für Touch-Geräte: die native HTML5-Drag-and-Drop-API feuert auf
+  // Handy/Tablet nicht, es gab vorher keinen Ersatzweg. "Tippen zum
+  // Verschieben" öffnet für denselben Einsatz denselben onDropAssignment-Call,
+  // den auch das Ziehen mit der Maus auslöst.
+  const [moveAssignment, setMoveAssignment] = useState<AssignmentWithDetails | null>(null);
+  const [moveEmpId, setMoveEmpId] = useState('');
+  const [moveDate, setMoveDate] = useState('');
+
   const cellKey = (empId: string, date: string) => `${empId}__${date}`;
 
   const assignmentsFor = (empId: string, date: string) =>
@@ -819,6 +815,18 @@ function WeekGrid({ weekDates, employees, weekAssignments, isEmployeeSickOnDate,
     setDragOverCell(null);
     const assignmentId = e.dataTransfer.getData('text/plain');
     if (assignmentId) onDropAssignment(assignmentId, empId, date);
+  };
+
+  const openMoveDialog = (a: AssignmentWithDetails) => {
+    setMoveAssignment(a);
+    setMoveEmpId(a.employee_id);
+    setMoveDate(a.date);
+  };
+
+  const confirmMove = () => {
+    if (!moveAssignment) return;
+    onDropAssignment(moveAssignment.id, moveEmpId, moveDate);
+    setMoveAssignment(null);
   };
 
   if (employees.length === 0) {
@@ -882,7 +890,8 @@ function WeekGrid({ weekDates, employees, weekAssignments, isEmployeeSickOnDate,
                               key={a.id}
                               draggable={!locked}
                               onDragStart={locked ? undefined : e => handleDragStart(e, a.id)}
-                              title={locked ? 'Bereits erledigt bzw. vergangen — kann nicht mehr verschoben werden' : 'Ziehen, um zu verschieben'}
+                              onClick={locked ? undefined : () => openMoveDialog(a)}
+                              title={locked ? 'Bereits erledigt bzw. vergangen — kann nicht mehr verschoben werden' : 'Ziehen oder antippen, um zu verschieben'}
                               className={`rounded-lg px-2 py-1.5 border transition-colors ${
                                 locked
                                   ? 'cursor-not-allowed bg-[#F8FAFC] border-[#E2E8F0] opacity-70'
@@ -903,7 +912,37 @@ function WeekGrid({ weekDates, employees, weekAssignments, isEmployeeSickOnDate,
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-[#94A3B8] px-4 py-3 border-t border-[#F1F5F9]">Einsätze per Drag-and-Drop auf einen anderen Mitarbeiter oder Tag ziehen, um sie umzuplanen.</p>
+      <p className="text-xs text-[#94A3B8] px-4 py-3 border-t border-[#F1F5F9]">Einsätze per Drag-and-Drop verschieben, oder auf Handy/Tablet antippen und Mitarbeiter/Tag im Dialog wählen.</p>
+
+      <Modal open={!!moveAssignment} onClose={() => setMoveAssignment(null)} width="max-w-sm">
+        <div className="p-8">
+          <h2 className="text-lg font-bold text-[#0F172A] mb-1">Einsatz verschieben</h2>
+          <p className="text-sm text-[#64748B] mb-5">{moveAssignment?.property?.name}</p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-[#64748B] mb-1.5 block">Mitarbeiter</label>
+              <select value={moveEmpId} onChange={e => setMoveEmpId(e.target.value)} className="input-field w-full">
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#64748B] mb-1.5 block">Tag</label>
+              <select value={moveDate} onChange={e => setMoveDate(e.target.value)} className="input-field w-full">
+                {weekDates.map((date, i) => {
+                  const d = new Date(date + 'T00:00:00');
+                  return <option key={date} value={date}>{WEEKDAY_LABELS[i]}, {d.getDate()}.{d.getMonth() + 1}.</option>;
+                })}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-8">
+            <button onClick={() => setMoveAssignment(null)} className="btn-ghost">Abbrechen</button>
+            <button onClick={confirmMove} className="btn-primary">Verschieben</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

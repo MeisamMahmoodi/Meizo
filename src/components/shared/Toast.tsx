@@ -36,7 +36,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed top-5 right-5 z-[100] flex flex-col gap-2.5">
+      {/* aria-live: Toasts waren bisher rein visuell - Screenreader-Nutzer
+          bekamen Erfolgs-/Fehlermeldungen gar nicht mit. */}
+      <div aria-live="polite" aria-atomic="false" className="fixed top-5 right-5 z-[100] flex flex-col gap-2.5">
         {toasts.map(toast => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
@@ -52,15 +54,18 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
   }, [toast.id, onRemove]);
 
   return (
-    <div className={`flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl shadow-elevated text-sm font-medium animate-slide-in backdrop-blur-sm ${
-      toast.type === 'success'
-        ? 'bg-brand-50/95 text-brand-700 border border-brand-200/60'
-        : 'bg-danger-50/95 text-danger-600 border border-danger-200/60'
-    }`}>
+    <div
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      className={`flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl shadow-elevated text-sm font-medium animate-slide-in backdrop-blur-sm ${
+        toast.type === 'success'
+          ? 'bg-brand-50/95 text-brand-700 border border-brand-200/60'
+          : 'bg-danger-50/95 text-danger-600 border border-danger-200/60'
+      }`}
+    >
       {toast.type === 'success' && <CheckCircle size={16} className="text-brand-500 shrink-0" />}
       {toast.type === 'error' && <AlertCircle size={16} className="text-danger-500 shrink-0" />}
       <span className="flex-1">{toast.message}</span>
-      <button onClick={() => onRemove(toast.id)} className="p-1 rounded-lg opacity-40 hover:opacity-100 transition-opacity shrink-0">
+      <button onClick={() => onRemove(toast.id)} aria-label="Meldung schließen" className="p-1 rounded-lg opacity-40 hover:opacity-100 transition-opacity shrink-0">
         <X size={14} />
       </button>
     </div>

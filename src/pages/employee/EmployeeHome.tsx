@@ -40,6 +40,8 @@ export function EmployeeHome({ onSickLeave }: EmployeeHomeProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [sickReports, setSickReports] = useState<SickReport[]>([]);
+  const [markingHealthy, setMarkingHealthy] = useState(false);
+  const [respondingReplacement, setRespondingReplacement] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -196,7 +198,10 @@ const { data: upcoming } = await supabase
   };
 
   const handleMarkAsHealthy = async () => {
-    if (!employee) return;
+    // Guard against double-tap: without this, a slow connection let people tap
+    // twice and fire the delete+update pair twice in a row.
+    if (!employee || markingHealthy) return;
+    setMarkingHealthy(true);
     try {
       const todayStr = toLocalDateStr(new Date());
 await supabase.from('sick_reports').delete()
@@ -212,28 +217,42 @@ await supabase.from('sick_reports').delete()
       setSickReports([]);
     } catch {
       // Handle error silently
+    } finally {
+      setMarkingHealthy(false);
     }
   };
 
   const handleAcceptReplacement = async () => {
-    if (!replacementRequest || !employee) return;
-    const { error: e1 } = await supabase.from('replacement_requests').update({ status: 'accepted' }).eq('id', replacementRequest.id);
-    if (e1) return;
-await supabase.from('assignments').insert({
-  property_id: replacementRequest.property_id,
-  employee_id: employee.id,
-  date: todayStr,
-  status: 'assigned',
-  time_from: replacementRequest.property?.time_from ?? null,
-  time_to: replacementRequest.property?.time_to ?? null,
-});
-    setRequestResponded(true);
+    // Guard against double-tap: a second tap before the first request/insert
+    // finished used to be able to create a duplicate assignment row.
+    if (!replacementRequest || !employee || respondingReplacement) return;
+    setRespondingReplacement(true);
+    try {
+      const { error: e1 } = await supabase.from('replacement_requests').update({ status: 'accepted' }).eq('id', replacementRequest.id);
+      if (e1) return;
+      await supabase.from('assignments').insert({
+        property_id: replacementRequest.property_id,
+        employee_id: employee.id,
+        date: todayStr,
+        status: 'assigned',
+        time_from: replacementRequest.property?.time_from ?? null,
+        time_to: replacementRequest.property?.time_to ?? null,
+      });
+      setRequestResponded(true);
+    } finally {
+      setRespondingReplacement(false);
+    }
   };
 
   const handleDeclineReplacement = async () => {
-    if (!replacementRequest) return;
-    await supabase.from('replacement_requests').update({ status: 'declined' }).eq('id', replacementRequest.id);
-    setRequestResponded(true);
+    if (!replacementRequest || respondingReplacement) return;
+    setRespondingReplacement(true);
+    try {
+      await supabase.from('replacement_requests').update({ status: 'declined' }).eq('id', replacementRequest.id);
+      setRequestResponded(true);
+    } finally {
+      setRespondingReplacement(false);
+    }
   };
 
   const handleMarkNotificationRead = async (notifId: string) => {
@@ -305,7 +324,7 @@ await supabase.from('assignments').insert({
         </div>
         <div className="flex items-center gap-1">
           <div className="relative" ref={langRef}>
-            <button onClick={() => setShowLangPicker(!showLangPicker)} className="p-2.5 rounded-xl hover:bg-surface-100 transition-colors">
+            <button onClick={() => setShowLangPicker(!showLangPicker)} aria-label={t('ariaChooseLanguage')} className="p-2.5 rounded-xl hover:bg-surface-100 transition-colors">
               <Globe size={20} className="text-ink-500" />
             </button>
             {showLangPicker && (
@@ -322,7 +341,8 @@ await supabase.from('assignments').insert({
           <button
             onClick={() => subscribed && permission === 'granted' ? unsubscribe() : subscribe()}
             disabled={pushLoading || permission === 'denied' || permission === 'unsupported'}
-            title={subscribed && permission === 'granted' ? 'Benachrichtigungen deaktivieren' : t('enableNotifications')}
+            title={subscribed && permission === 'granted' ? t('disableNotifications') : t('enableNotifications')}
+            aria-label={subscribed && permission === 'granted' ? t('disableNotifications') : t('enableNotifications')}
             className="p-2.5 rounded-xl hover:bg-surface-100 transition-colors disabled:opacity-40"
           >
             {subscribed && permission === 'granted'
@@ -331,7 +351,7 @@ await supabase.from('assignments').insert({
             }
           </button>
           <div className="relative" ref={notifRef}>
-            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 rounded-xl hover:bg-surface-100 transition-colors">
+            <button onClick={() => setShowNotifications(!showNotifications)} aria-label={t('notifications')} className="relative p-2.5 rounded-xl hover:bg-surface-100 transition-colors">
               <Bell size={20} className="text-ink-500" />
               {unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-danger-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold px-1">{unreadCount}</span>}
             </button>
@@ -375,7 +395,7 @@ await supabase.from('assignments').insert({
                 {t('allowNotificationsDesc')}
               </p>
             </div>
-            <button onClick={() => setShowPushPrompt(false)} className="text-[#94A3B8] hover:text-[#64748B] shrink-0 mt-0.5">
+            <button onClick={() => setShowPushPrompt(false)} aria-label={t('ariaDismiss')} className="text-[#94A3B8] hover:text-[#64748B] shrink-0 mt-0.5">
               <BellOff size={15} />
             </button>
           </div>
@@ -432,7 +452,8 @@ await supabase.from('assignments').insert({
               </div>
               <button
                 onClick={handleMarkAsHealthy}
-                className="mt-3 py-2 px-3 rounded-lg text-sm font-semibold bg-danger-500 text-white hover:bg-danger-600 transition-colors"
+                disabled={markingHealthy}
+                className="mt-3 py-2 px-3 rounded-lg text-sm font-semibold bg-danger-500 text-white hover:bg-danger-600 transition-colors disabled:opacity-60"
               >
                 {t('markAsHealthy')}
               </button>
@@ -452,7 +473,7 @@ await supabase.from('assignments').insert({
                   <p className="text-sm font-semibold text-ink-900">{n.title}</p>
                   <p className="text-sm text-ink-500 mt-0.5">{n.message}</p>
                 </div>
-                <button onClick={() => handleMarkNotificationRead(n.id)} className="text-ink-300 hover:text-ink-700 transition-colors shrink-0"><CheckCircle size={18} /></button>
+                <button onClick={() => handleMarkNotificationRead(n.id)} aria-label={t('ariaMarkNotificationRead')} className="text-ink-300 hover:text-ink-700 transition-colors shrink-0"><CheckCircle size={18} /></button>
               </div>
             </div>
           ))}
@@ -469,8 +490,8 @@ await supabase.from('assignments').insert({
           <p className="text-sm text-ink-700 mb-1">{replacementRequest.sickEmployee?.first_name} {t('canYouCover')}</p>
           <p className="text-sm text-ink-500">{replacementRequest.property?.name} · {formatTime(replacementRequest.property?.time_from || '')}–{formatTime(replacementRequest.property?.time_to || '')} Uhr</p>
           <div className="flex gap-3 mt-4">
-            <button onClick={handleAcceptReplacement} className="flex-1 py-3 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 transition-colors">{t('yesICan')}</button>
-            <button onClick={handleDeclineReplacement} className="flex-1 py-3 rounded-xl text-sm font-semibold bg-surface-100 text-ink-500 hover:bg-surface-200 transition-colors">{t('no')}</button>
+            <button onClick={handleAcceptReplacement} disabled={respondingReplacement} className="flex-1 py-3 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 transition-colors disabled:opacity-60">{t('yesICan')}</button>
+            <button onClick={handleDeclineReplacement} disabled={respondingReplacement} className="flex-1 py-3 rounded-xl text-sm font-semibold bg-surface-100 text-ink-500 hover:bg-surface-200 transition-colors disabled:opacity-60">{t('no')}</button>
           </div>
         </div>
       )}

@@ -86,7 +86,10 @@ function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; 
     e.preventDefault();
     setError('');
     if (!form.owner_name || !form.company_name || !form.email || !form.password) { setError('Alle Pflichtfelder ausfüllen.'); return; }
-    if (form.password.length < 8) { setError('Passwort muss mindestens 8 Zeichen haben.'); return; }
+    // Einheitlich mit Registrierung, Owner-Settings und Passwort-Reset - vorher
+    // war hier 8 Zeichen verlangt, überall sonst in der App 6, was verwirrend
+    // war, wenn ein Admin ein Passwort setzen wollte, das anderswo gültig ist.
+    if (form.password.length < 6) { setError('Passwort muss mindestens 6 Zeichen haben.'); return; }
     setLoading(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-owner-user`, {
@@ -118,7 +121,7 @@ function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; 
         </Field>
         <Field label="Passwort *">
           <div className="relative">
-            <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} className="input-field text-sm !pr-10" placeholder="Mindestens 8 Zeichen" />
+            <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} className="input-field text-sm !pr-10" placeholder="Mindestens 6 Zeichen" />
             <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
               {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -366,10 +369,14 @@ function ResetPasswordModal({ user, onClose, token }: { user: AuthUser; onClose:
 }
 
 // ── Delete User Modal ────────────────────────────────────────────────────────
-function DeleteUserModal({ user, onClose, onDone, token }: { user: AuthUser; onClose: () => void; onDone: () => void; token?: string }) {
+function DeleteUserModal({ user, isSelf, onClose, onDone, token }: { user: AuthUser; isSelf?: boolean; onClose: () => void; onDone: () => void; token?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmText, setConfirmText] = useState('');
+  // Beim eigenen Konto gibt es vorher gar keine besondere Warnung - man
+  // konnte sich versehentlich selbst aus dem Admin-Bereich löschen, ohne
+  // dass die Konsequenz (sofortiger Logout, kein Zugriff mehr) klar war.
+  const requiredPhrase = isSelf ? 'MEIN KONTO LÖSCHEN' : 'LÖSCHEN';
 
   const submit = async () => {
     setError('');
@@ -389,16 +396,21 @@ function DeleteUserModal({ user, onClose, onDone, token }: { user: AuthUser; onC
         <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center mx-auto">
           <Trash2 size={22} className="text-red-600" />
         </div>
+        {isSelf && (
+          <p className="text-sm font-bold text-red-700 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            Achtung: Das ist dein eigenes Konto. Du wirst sofort ausgeloggt und verlierst den Zugriff auf den Admin-Bereich.
+          </p>
+        )}
         <p className="text-sm text-slate-500 text-center">
           <strong>{user.email}</strong> wird unwiderruflich aus der Authentifizierung entfernt. Zugehörige Firmen- oder Mitarbeiter-Datensätze bleiben erhalten (ohne Login).
         </p>
-        <Field label={`Tippe "LÖSCHEN" zum Bestätigen`}>
+        <Field label={`Tippe "${requiredPhrase}" zum Bestätigen`}>
           <input value={confirmText} onChange={e => setConfirmText(e.target.value)} className="input-field text-sm" />
         </Field>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Abbrechen</button>
-          <button onClick={submit} disabled={loading || confirmText !== 'LÖSCHEN'} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+          <button onClick={submit} disabled={loading || confirmText !== requiredPhrase} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
             {loading ? '…' : 'Endgültig löschen'}
           </button>
         </div>
@@ -415,7 +427,8 @@ function CreateUserModal({ onClose, onCreated, token }: { onClose: () => void; o
 
   const submit = async () => {
     setError('');
-    if (!form.email || form.password.length < 8) { setError('E-Mail und Passwort (min. 8 Zeichen) erforderlich'); return; }
+    // Einheitlich mit dem Rest der App (siehe Owner-Erstellung oben) - 6 statt 8 Zeichen.
+    if (!form.email || form.password.length < 6) { setError('E-Mail und Passwort (min. 6 Zeichen) erforderlich'); return; }
     setLoading(true);
     try {
       await callAdminAction('create-user', form, token);
@@ -430,7 +443,7 @@ function CreateUserModal({ onClose, onCreated, token }: { onClose: () => void; o
     <Modal title="Auth-Konto anlegen" onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
         <Field label="E-Mail *"><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-field text-sm" /></Field>
-        <Field label="Passwort *"><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="input-field text-sm" placeholder="Min. 8 Zeichen" /></Field>
+        <Field label="Passwort *"><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="input-field text-sm" placeholder="Min. 6 Zeichen" /></Field>
         <Field label="Rolle">
           <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input-field text-sm">
             <option value="owner">Owner</option><option value="employee">Employee</option><option value="admin">Admin</option>
@@ -632,7 +645,7 @@ function MiniMetric({ label, value, icon: Icon }: { label: string; value: number
 }
 
 // ── Users Tab ────────────────────────────────────────────────────────────────
-function UsersTab({ token, companies }: { token?: string; companies: CompanyRow[] }) {
+function UsersTab({ token, companies, currentUserId }: { token?: string; companies: CompanyRow[]; currentUserId?: string }) {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -733,7 +746,11 @@ function UsersTab({ token, companies }: { token?: string; companies: CompanyRow[
       <button onClick={() => setResetTarget(u)} className="flex items-center gap-1 text-xs font-semibold bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50" title="Passwort ändern">
         <Key size={12} /> PW
       </button>
-      <button onClick={() => setDeleteTarget(u)} className="flex items-center gap-1 text-xs font-semibold bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50" title="Konto löschen">
+      <button
+        onClick={() => setDeleteTarget(u)}
+        className="flex items-center gap-1 text-xs font-semibold bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50"
+        title={u.id === currentUserId ? 'Dein eigenes Konto löschen' : 'Konto löschen'}
+      >
         <Trash2 size={12} />
       </button>
     </div>
@@ -879,7 +896,7 @@ function UsersTab({ token, companies }: { token?: string; companies: CompanyRow[
       </div>
 
       {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} token={token} />}
-      {deleteTarget && <DeleteUserModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDone={load} token={token} />}
+      {deleteTarget && <DeleteUserModal user={deleteTarget} isSelf={deleteTarget.id === currentUserId} onClose={() => setDeleteTarget(null)} onDone={load} token={token} />}
       {createOpen && <CreateUserModal onClose={() => setCreateOpen(false)} onCreated={load} token={token} />}
     </div>
   );
@@ -1068,7 +1085,7 @@ export function AdminDashboard() {
           </>
         )}
 
-        {tab === 'users' && <UsersTab token={token} companies={companies} />}
+        {tab === 'users' && <UsersTab token={token} companies={companies} currentUserId={session?.user?.id} />}
         {tab === 'database' && <DatabaseTab />}
       </main>
 

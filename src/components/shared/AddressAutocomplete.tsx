@@ -38,8 +38,14 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(false);
+  // Für Tastatur-Navigation in der Vorschlagsliste (Pfeiltasten + Enter).
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Zählt jede Suche durch, damit eine spät zurückkommende Antwort für eine
+  // schon wieder überholte Eingabe die aktuelleren Ergebnisse nicht
+  // überschreibt (schnelles Tippen konnte vorher veraltete Vorschläge zeigen).
+  const requestIdRef = useRef(0);
 
   // Sync external value changes (e.g. reset)
   useEffect(() => {
@@ -51,18 +57,21 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
   }, [value]);
 
   const search = useCallback(async (q: string) => {
+    const requestId = ++requestIdRef.current;
     if (q.trim().length < 5) { setResults([]); setOpen(false); return; }
     setLoading(true);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=de,at,ch&q=${encodeURIComponent(q)}`;
       const res = await fetch(url, { headers: { 'Accept-Language': 'de' } });
       const data: NominatimResult[] = await res.json();
+      if (requestId !== requestIdRef.current) return; // eine neuere Suche läuft bereits
       setResults(data);
       setOpen(data.length > 0);
+      setActiveIndex(-1);
     } catch {
-      setResults([]);
+      if (requestId === requestIdRef.current) setResults([]);
     }
-    setLoading(false);
+    if (requestId === requestIdRef.current) setLoading(false);
   }, []);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +92,28 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
     setQuery(formatted);
     setSelected(true);
     setOpen(false);
+    setActiveIndex(-1);
     onChange({ formatted, lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+  };
+
+  // Tastatursteuerung: vorher war die Liste nur mit der Maus bedienbar.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open || results.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % results.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev <= 0 ? results.length - 1 : prev - 1));
+    } else if (e.key === 'Enter') {
+      if (activeIndex >= 0 && activeIndex < results.length) {
+        e.preventDefault();
+        pick(results[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setActiveIndex(-1);
+    }
   };
 
   // Close on outside click
@@ -96,6 +126,7 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
   }, []);
 
   const isIncomplete = !selected && query.trim().length > 0;
+  const listboxId = 'address-autocomplete-listbox';
 
   return (
     <div ref={containerRef} className="relative">
@@ -105,9 +136,15 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
           type="text"
           value={query}
           onChange={handleInput}
+          onKeyDown={handleKeyDown}
           onFocus={() => { if (results.length > 0 && !selected) setOpen(true); }}
           placeholder={placeholder}
           autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
           className={`input-field !pl-9 !pr-9 ${isIncomplete ? 'border-[#F97316] focus:ring-[#F97316]/20' : ''} ${className ?? ''}`}
         />
         {loading && (
@@ -122,18 +159,20 @@ export function AddressAutocomplete({ value, onChange, placeholder = 'Straße, N
       )}
 
       {open && results.length > 0 && (
-        <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] overflow-hidden animate-scale-in">
-          {results.map(r => {
+        <ul id={listboxId} role="listbox" className="absolute z-50 left-0 right-0 mt-1 bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] overflow-hidden animate-scale-in">
+          {results.map((r, i) => {
             const a = r.address;
             const street = [a.road, a.house_number].filter(Boolean).join(' ');
             const location = [a.postcode, a.city ?? a.town ?? a.village ?? a.county].filter(Boolean).join(' ');
             const country = a.country ?? '';
+            const active = i === activeIndex;
             return (
-              <li key={r.place_id}>
+              <li key={r.place_id} id={`${listboxId}-${i}`} role="option" aria-selected={active}>
                 <button
                   type="button"
                   onMouseDown={e => { e.preventDefault(); pick(r); }}
-                  className="w-full text-left px-4 py-3 hover:bg-[#F8FAFC] transition-colors flex items-start gap-3 border-b border-[#F1F5F9] last:border-0"
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={`w-full text-left px-4 py-3 transition-colors flex items-start gap-3 border-b border-[#F1F5F9] last:border-0 ${active ? 'bg-[#F8FAFC]' : 'hover:bg-[#F8FAFC]'}`}
                 >
                   <MapPin size={14} className="text-[#94A3B8] mt-0.5 shrink-0" />
                   <div className="min-w-0">

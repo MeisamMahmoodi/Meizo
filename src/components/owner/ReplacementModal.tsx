@@ -5,6 +5,7 @@ import { Avatar } from '../shared/Avatar';
 import { formatTime, toLocalDateStr } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 import { sendPushToEmployee } from '../../hooks/usePushNotifications';
+import { useToast } from '../shared/Toast';
 import type { Employee, Property, SickReport, EmployeeProperty, Assignment } from '../../lib/types';
 
 interface ReplacementModalProps {
@@ -34,6 +35,7 @@ export function ReplacementModal({
   type AvailableEmployee = Employee & { knowsProperty: boolean; availStatus: 'free' | 'partial' | 'unknown'; empAssignments: Assignment[] };
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const { addToast } = useToast();
 
   const availableEmployees = useMemo((): AvailableEmployee[] => {
     const sickEmployeeId = sickReport.employee_id;
@@ -112,6 +114,9 @@ if (existing) {
       });
 
       if (error) {
+        // Vorher gab es hier keinerlei Rückmeldung: der Button hörte einfach
+        // auf zu laden, und der Owner wusste nicht, ob die Anfrage raus ist.
+        addToast('Fehler beim Senden der Vertretungsanfrage', 'error');
         setSending(false);
         return;
       }
@@ -123,6 +128,7 @@ if (existing) {
 
       onComplete();
     } catch {
+      addToast('Fehler beim Senden der Vertretungsanfrage', 'error');
       setSending(false);
     }
   };

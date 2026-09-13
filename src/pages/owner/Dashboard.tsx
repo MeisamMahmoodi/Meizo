@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { formatDateLong, formatTime, getTodayDayAbbrev, toLocalDateStr } from '../../lib/utils';
 import type { Employee, Property, Assignment, SickReport, EmployeeProperty } from '../../lib/types';
 import { ReplacementModal } from '../../components/owner/ReplacementModal';
-import { Modal } from '../../components/shared/Modal';
+import { RemoveAssignmentModal } from '../../components/owner/RemoveAssignmentModal';
 import { Avatar } from '../../components/shared/Avatar';
 import { useToast } from '../../components/shared/Toast';
 import { sendPushToEmployee } from '../../hooks/usePushNotifications';
@@ -242,7 +242,8 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
 
   const handleCheckIn = async (id: string) => {
     const { error } = await supabase.from('assignments').update({ status: 'checked_in', checked_in_at: new Date().toISOString() }).eq('id', id);
-    if (!error) onRefresh();
+    if (error) { addToast('Fehler beim Einchecken', 'error'); return; }
+    onRefresh();
   };
 
   const sickCount = sickReportsForCompany.length;
@@ -313,7 +314,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           )}
         </div>
         <div className="relative" ref={notifRef}>
-          <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 rounded-xl hover:bg-white/60 transition-colors">
+          <button onClick={() => setShowNotifications(!showNotifications)} aria-label="Benachrichtigungen" className="relative p-2.5 rounded-xl hover:bg-white/60 transition-colors">
             <Bell size={20} className="text-[#64748B]" />
             {sickCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#EF4444] rounded-full text-white text-[10px] flex items-center justify-center font-bold px-1">{sickCount}</span>}
           </button>
@@ -552,7 +553,14 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           <span className="text-xs text-[#94A3B8] font-medium">{today.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
         </div>
 
-        {todayAssignments.length === 0 ? (
+        {loading ? (
+          // Vorher wurde hier beim ersten Laden kurz "Keine Einsätze für
+          // heute" angezeigt, bevor die echten Daten da waren - sah aus wie
+          // ein leerer Tag, obwohl nur noch geladen wurde.
+          <div className="card p-10 text-center">
+            <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        ) : todayAssignments.length === 0 ? (
           <div className="card p-10 text-center">
             <CalendarDays size={36} className="text-[#CBD5E1] mx-auto mb-3" />
             <p className="text-sm text-[#94A3B8]">Keine Einsätze für heute</p>
@@ -665,20 +673,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
       )}
 
       {/* Remove Confirmation */}
-      <Modal open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} width="max-w-sm">
-        <div className="p-8">
-          <div className="w-12 h-12 rounded-2xl bg-[#FEF2F2] flex items-center justify-center mb-5">
-            <AlertTriangle size={22} className="text-[#EF4444]" />
-          </div>
-          <h2 className="text-lg font-bold text-[#0F172A] mb-2">Zuweisung entfernen?</h2>
-          <p className="text-sm text-[#64748B] leading-relaxed mb-8">Der Mitarbeiter wird von diesem Einsatz entfernt.</p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setRemoveConfirm(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={() => removeConfirm && handleRemoveAssignment(removeConfirm)} className="btn-danger">Entfernen</button>
-
-          </div>
-        </div>
-      </Modal>
+      <RemoveAssignmentModal assignment={removeConfirm} onClose={() => setRemoveConfirm(null)} onConfirm={handleRemoveAssignment} />
     </div>
   );
 }

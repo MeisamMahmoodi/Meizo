@@ -166,7 +166,15 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
     const empsWithoutWage = employees.filter(e => e.hourly_wage == null);
     if (empsWithoutWage.length === 0) { setWageModal(false); return; }
     const { error } = await supabase.from('employees').update({ hourly_wage: wage }).in('id', empsWithoutWage.map(e => e.id));
-    if (!error) { onRefresh(); addToast(`Stundenlohn (${wage.toFixed(2)} EUR) fuer ${empsWithoutWage.length} Mitarbeiter gesetzt`); }
+    if (error) {
+      // Vorher schloss sich das Modal auch bei einem Fehler, als waere der
+      // Lohn gesetzt worden - der Owner dachte, es hat geklappt, obwohl in
+      // der DB nichts geaendert wurde.
+      addToast('Stundenlohn konnte nicht gesetzt werden', 'error');
+      return;
+    }
+    onRefresh();
+    addToast(`Stundenlohn (${wage.toFixed(2)} EUR) fuer ${empsWithoutWage.length} Mitarbeiter gesetzt`);
     setWageModal(false);
     setDefaultWage('');
   };
@@ -175,7 +183,14 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
     const wage = parseFloat(editingWageValue);
     if (isNaN(wage) || wage < 0) { setEditingWageId(null); return; }
     const { error } = await supabase.from('employees').update({ hourly_wage: wage || null }).eq('id', employeeId);
-    if (!error) { onRefresh(); addToast('Stundenlohn gespeichert'); }
+    if (error) {
+      // Feld nicht schliessen, wenn der Save fehlgeschlagen ist - sonst sieht
+      // es so aus, als waere der neue Lohn gespeichert worden.
+      addToast('Stundenlohn konnte nicht gespeichert werden', 'error');
+      return;
+    }
+    onRefresh();
+    addToast('Stundenlohn gespeichert');
     setEditingWageId(null);
     setEditingWageValue('');
   };

@@ -32,6 +32,8 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<Employee | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<{ assignments: number; futureAssignments: number } | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { addToast } = useToast();
 
   // Zeigt in der Löschbestätigung die echte Anzahl betroffener Einsätze an,
@@ -179,22 +181,30 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   };
 
   const handleEditEmployee = async () => {
-    if (!editModal || !editFirst || !editLast) return;
-    const updatePayload: Record<string, unknown> = {
-      first_name: editFirst, last_name: editLast, phone: editPhone,
-      hourly_wage: editWage ? parseFloat(editWage) : null,
-      datev_personalnummer: editPersonalnummer || null,
-    };
-    const { error } = await supabase.from('employees').update(updatePayload).eq('id', editModal.id);
-    if (error) { addToast('Fehler beim Speichern', 'error'); return; }
+    // Guard against double-click: two parallel saves used to compute the
+    // same employee_properties diff from the same stale state, risking
+    // duplicate/inconsistent assignments.
+    if (!editModal || !editFirst || !editLast || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const updatePayload: Record<string, unknown> = {
+        first_name: editFirst, last_name: editLast, phone: editPhone,
+        hourly_wage: editWage ? parseFloat(editWage) : null,
+        datev_personalnummer: editPersonalnummer || null,
+      };
+      const { error } = await supabase.from('employees').update(updatePayload).eq('id', editModal.id);
+      if (error) { addToast('Fehler beim Speichern', 'error'); return; }
 
-    const currentPropIds = employeeProperties.filter(ep => ep.employee_id === editModal.id).map(ep => ep.property_id);
-    const toAdd = editPropertyIds.filter(id => !currentPropIds.includes(id));
-    const toRemove = currentPropIds.filter(id => !editPropertyIds.includes(id));
-    if (toRemove.length > 0) await supabase.from('employee_properties').delete().eq('employee_id', editModal.id).in('property_id', toRemove);
-    if (toAdd.length > 0) await supabase.from('employee_properties').insert(toAdd.map(pid => ({ employee_id: editModal.id, property_id: pid })));
+      const currentPropIds = employeeProperties.filter(ep => ep.employee_id === editModal.id).map(ep => ep.property_id);
+      const toAdd = editPropertyIds.filter(id => !currentPropIds.includes(id));
+      const toRemove = currentPropIds.filter(id => !editPropertyIds.includes(id));
+      if (toRemove.length > 0) await supabase.from('employee_properties').delete().eq('employee_id', editModal.id).in('property_id', toRemove);
+      if (toAdd.length > 0) await supabase.from('employee_properties').insert(toAdd.map(pid => ({ employee_id: editModal.id, property_id: pid })));
 
-    setEditModal(null); onRefresh(); addToast('Mitarbeiter aktualisiert');
+      setEditModal(null); onRefresh(); addToast('Mitarbeiter aktualisiert');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleMarkSick = async (emp: Employee) => {
@@ -219,14 +229,27 @@ const handleMarkActive = async (emp: Employee) => {
 };
 
 const handleDelete = async (emp: Employee) => {
-  await supabase.from('sick_reports').delete().eq('employee_id', emp.id);
-  await supabase.from('assignments').delete().eq('employee_id', emp.id);
-  await supabase.from('replacement_requests').delete().eq('replacement_employee_id', emp.id);
-  await supabase.from('employee_properties').delete().eq('employee_id', emp.id);
-  const { error: e2 } = await supabase.from('employees').delete().eq('id', emp.id);
-  if (e2) { addToast('Fehler beim Löschen', 'error'); return; }
-  setDeleteConfirm(null); setMenuOpen(null); onRefresh(); addToast('Mitarbeiter gelöscht');
-  syncSeats();
+  // Every cascade step is checked now - previously only the final employees
+  // delete was checked, so a failed intermediate step could silently leave
+  // sick reports/assignments deleted while the employee record itself stayed.
+  if (deleting) return;
+  setDeleting(true);
+  try {
+    const r1 = await supabase.from('sick_reports').delete().eq('employee_id', emp.id);
+    if (r1.error) { addToast('Fehler beim Löschen der Krankmeldungen', 'error'); return; }
+    const r2 = await supabase.from('assignments').delete().eq('employee_id', emp.id);
+    if (r2.error) { addToast('Fehler beim Löschen der Einsätze', 'error'); return; }
+    const r3 = await supabase.from('replacement_requests').delete().eq('replacement_employee_id', emp.id);
+    if (r3.error) { addToast('Fehler beim Löschen der Vertretungsanfragen', 'error'); return; }
+    const r4 = await supabase.from('employee_properties').delete().eq('employee_id', emp.id);
+    if (r4.error) { addToast('Fehler beim Löschen der Objektzuordnungen', 'error'); return; }
+    const { error: e2 } = await supabase.from('employees').delete().eq('id', emp.id);
+    if (e2) { addToast('Fehler beim Löschen', 'error'); return; }
+    setDeleteConfirm(null); setMenuOpen(null); onRefresh(); addToast('Mitarbeiter gelöscht');
+    syncSeats();
+  } finally {
+    setDeleting(false);
+  }
 };
 
   const toggleProperty = (pid: string, setter: typeof setNewPropertyIds) => {
@@ -524,7 +547,7 @@ const handleDelete = async (emp: Employee) => {
           </div>
           <div className="flex justify-end gap-3 mt-8">
             <button onClick={() => setEditModal(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={handleEditEmployee} disabled={!editFirst || !editLast} className="btn-primary">Speichern</button>
+            <button onClick={handleEditEmployee} disabled={!editFirst || !editLast || savingEdit} className="btn-primary">{savingEdit ? 'Wird gespeichert...' : 'Speichern'}</button>
           </div>
         </div>
       </Modal>
@@ -553,8 +576,8 @@ const handleDelete = async (emp: Employee) => {
             <div className="mb-8" />
           )}
           <div className="flex justify-end gap-3">
-            <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="btn-danger">Löschen</button>
+            <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="btn-ghost">Abbrechen</button>
+            <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} disabled={deleting} className="btn-danger">{deleting ? 'Wird gelöscht...' : 'Löschen'}</button>
           </div>
         </div>
       </Modal>

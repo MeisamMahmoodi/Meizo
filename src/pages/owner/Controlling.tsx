@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Euro, TrendingUp, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Employee, Property, Assignment, Company } from '../../lib/types';
@@ -29,10 +29,17 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [loading, setLoading] = useState(true);
+  // Zählt jeden Fetch durch, damit eine spät zurückkommende Antwort für einen
+  // bereits wieder verlassenen Monat die Anzeige nicht überschreibt (z. B.
+  // schnelles Doppelklicken auf "vor"/"zurück").
+  const requestIdRef = useRef(0);
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedMonth]);
 
   async function loadData() {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
     try {
       const [year, month] = selectedMonth.split('-').map(Number);
       const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -44,10 +51,13 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
         supabase.from('assignments').select('*, employee:employees(*), property:properties(*)').gte('date', monthStart).lte('date', monthEnd),
       ]);
 
+      if (requestId !== requestIdRef.current) return;
       setProperties(propRes.data || []);
       setMonthAssignments((assignRes.data as unknown as AssignmentWithDetails[]) || []);
     } catch {
       // Component renders with existing state
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
@@ -142,37 +152,50 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
       )}
 
       {/* Top stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="card p-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-2">Umsatz {isCurrentMonth ? '(bisher)' : ''}</p>
-          <p className="text-3xl font-bold text-[#0F172A] tracking-tight">{totals.umsatz.toLocaleString('de-DE')} €</p>
-          <p className="text-xs text-[#64748B] mt-1.5">Summe Monatspreise aller Objekte</p>
+      {loading ? (
+        // Vorher zeigten diese Kacheln beim Monatswechsel kurz die alten
+        // Zahlen unter dem bereits neuen Monatsnamen an, bis die Antwort da
+        // war - ein Ladezustand statt der veralteten Zahlen verhindert das.
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="card p-6 h-[104px] flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ))}
         </div>
-        <div className="card p-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-2">Personalkosten {isCurrentMonth ? '(bisher)' : ''}</p>
-          <p className="text-3xl font-bold text-[#0F172A] tracking-tight">{totals.kosten.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €</p>
-          <p className="text-xs text-[#64748B] mt-1.5">Aus geleisteten Stunden × Stundenlohn</p>
-        </div>
-        <div className="card p-6 flex items-center gap-5">
-          <div className="relative w-[84px] h-[84px] shrink-0">
-            <svg width="84" height="84" viewBox="0 0 84 84">
-              <circle cx="42" cy="42" r="34" fill="none" stroke="#F1F5F9" strokeWidth="8" />
-              <circle
-                cx="42" cy="42" r="34" fill="none" stroke={margeColor(totals.marge)} strokeWidth="8"
-                strokeDasharray={ringCircumference} strokeDashoffset={ringOffset} strokeLinecap="round"
-                transform="rotate(-90 42 42)" style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold text-[#0F172A]">{totals.marge != null ? `${Math.round(totals.marge)}%` : '–'}</span>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="card p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-2">Umsatz {isCurrentMonth ? '(bisher)' : ''}</p>
+            <p className="text-3xl font-bold text-[#0F172A] tracking-tight">{totals.umsatz.toLocaleString('de-DE')} €</p>
+            <p className="text-xs text-[#64748B] mt-1.5">Summe Monatspreise aller Objekte</p>
+          </div>
+          <div className="card p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-2">Personalkosten {isCurrentMonth ? '(bisher)' : ''}</p>
+            <p className="text-3xl font-bold text-[#0F172A] tracking-tight">{totals.kosten.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €</p>
+            <p className="text-xs text-[#64748B] mt-1.5">Aus geleisteten Stunden × Stundenlohn</p>
+          </div>
+          <div className="card p-6 flex items-center gap-5">
+            <div className="relative w-[84px] h-[84px] shrink-0">
+              <svg width="84" height="84" viewBox="0 0 84 84">
+                <circle cx="42" cy="42" r="34" fill="none" stroke="#F1F5F9" strokeWidth="8" />
+                <circle
+                  cx="42" cy="42" r="34" fill="none" stroke={margeColor(totals.marge)} strokeWidth="8"
+                  strokeDasharray={ringCircumference} strokeDashoffset={ringOffset} strokeLinecap="round"
+                  transform="rotate(-90 42 42)" style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold text-[#0F172A]">{totals.marge != null ? `${Math.round(totals.marge)}%` : '–'}</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-1">Marge gesamt</p>
+              <p className="text-xs text-[#64748B]">(Umsatz − Kosten) / Umsatz</p>
             </div>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#94A3B8] mb-1">Marge gesamt</p>
-            <p className="text-xs text-[#64748B]">(Umsatz − Kosten) / Umsatz</p>
-          </div>
         </div>
-      </div>
+      )}
 
       {/* Per-property breakdown */}
       <div className="card p-0 overflow-hidden">
@@ -180,7 +203,11 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
           <h2 className="text-sm font-bold text-[#0F172A]">Soll-Ist-Stunden & Marge pro Objekt</h2>
         </div>
         <div className="divide-y divide-[#F1F5F9]">
-          {perProperty.map(p => {
+          {loading ? (
+            <div className="px-6 py-10 text-center">
+              <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : perProperty.map(p => {
             const pct = p.sollMinutes > 0 ? Math.min(150, (p.istMinutes / p.sollMinutes) * 100) : (p.istMinutes > 0 ? 100 : 0);
             const overBudget = p.sollMinutes > 0 && p.istMinutes > p.sollMinutes;
             return (

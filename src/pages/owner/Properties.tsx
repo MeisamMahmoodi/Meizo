@@ -34,6 +34,8 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<{ assignments: number; futureAssignments: number; employees: number } | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'newest'>('name');
@@ -101,24 +103,41 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   };
 
   const handleEditProperty = async () => {
-    if (!editModal || !editName) return;
-    const { error } = await supabase.from('properties').update({
-      name: editName, address: editAddress.formatted, type: editType,
-      lat: editAddress.lat, lng: editAddress.lng,
-      monthly_price: editPrice ? Number(editPrice) : null,
-    }).eq('id', editModal.id);
+    // Guard against double-click, matching the same fix in Employees.tsx.
+    if (!editModal || !editName || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.from('properties').update({
+        name: editName, address: editAddress.formatted, type: editType,
+        lat: editAddress.lat, lng: editAddress.lng,
+        monthly_price: editPrice ? Number(editPrice) : null,
+      }).eq('id', editModal.id);
 
-    if (error) { addToast('Fehler beim Speichern', 'error'); return; }
+      if (error) { addToast('Fehler beim Speichern', 'error'); return; }
 
-    setEditModal(null); onRefresh(); addToast('Objekt aktualisiert');
+      setEditModal(null); onRefresh(); addToast('Objekt aktualisiert');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleDelete = async (prop: Property) => {
-    await supabase.from('employee_properties').delete().eq('property_id', prop.id);
-    await supabase.from('assignments').delete().eq('property_id', prop.id);
-    const { error } = await supabase.from('properties').delete().eq('id', prop.id);
-    if (error) { addToast('Fehler beim Löschen', 'error'); return; }
-    setDeleteConfirm(null); setMenuOpen(null); onRefresh(); addToast('Objekt gelöscht');
+    // Every cascade step is checked now, matching the same fix in
+    // Employees.tsx - previously a failed intermediate delete could leave
+    // assignments gone while the property itself stayed.
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const r1 = await supabase.from('employee_properties').delete().eq('property_id', prop.id);
+      if (r1.error) { addToast('Fehler beim Löschen der Mitarbeiterzuordnungen', 'error'); return; }
+      const r2 = await supabase.from('assignments').delete().eq('property_id', prop.id);
+      if (r2.error) { addToast('Fehler beim Löschen der Einsätze', 'error'); return; }
+      const { error } = await supabase.from('properties').delete().eq('id', prop.id);
+      if (error) { addToast('Fehler beim Löschen', 'error'); return; }
+      setDeleteConfirm(null); setMenuOpen(null); onRefresh(); addToast('Objekt gelöscht');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleCopyCustomerLink = async (prop: Property) => {
@@ -306,7 +325,7 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
           </div>
           <div className="flex justify-end gap-3 mt-8">
             <button onClick={() => setEditModal(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={handleEditProperty} disabled={!editName || !editAddress.lat} className="btn-primary">Speichern</button>
+            <button onClick={handleEditProperty} disabled={!editName || !editAddress.lat || savingEdit} className="btn-primary">{savingEdit ? 'Wird gespeichert...' : 'Speichern'}</button>
           </div>
         </div>
       </Modal>
@@ -342,8 +361,8 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
             <div className="mb-8" />
           )}
           <div className="flex justify-end gap-3">
-            <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">Abbrechen</button>
-            <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="btn-danger">Löschen</button>
+            <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="btn-ghost">Abbrechen</button>
+            <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} disabled={deleting} className="btn-danger">{deleting ? 'Wird gelöscht...' : 'Löschen'}</button>
           </div>
         </div>
       </Modal>

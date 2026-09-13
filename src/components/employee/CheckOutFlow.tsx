@@ -1,8 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Camera, Check, X, RotateCcw, Loader2, Clock, CloudOff, ListChecks } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { addPendingAction, isLikelyNetworkError } from '../../lib/offlineQueue';
 import { t, type Lang } from '../../lib/i18n';
+import { useCameraCapture } from '../../hooks/useCameraCapture';
+import { CameraCaptureView } from '../shared/CameraCaptureView';
 import type { ChecklistItem, Property } from '../../lib/types';
 
 interface CheckOutFlowProps {
@@ -28,14 +30,15 @@ function formatDuration(ms: number): string {
 
 export function CheckOutFlow({ assignmentId, propertyName, propertyType, checkedInAt, onSuccess, onQueued, onCancel, rtl, lang = 'de' }: CheckOutFlowProps) {
   const [step, setStep] = useState<Step>('intro');
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [doneTime, setDoneTime] = useState<Date | null>(null);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [checkedLabels, setCheckedLabels] = useState<Set<string>>(new Set());
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Punkte, die an diesem Tag nicht zutreffen (z.B. "Fenster geputzt", wenn
+  // Fenster diesmal nicht dran waren) — ohne das musste man frueher jeden
+  // Punkt abhaken, auch unehrlich, um ueberhaupt weiterzukommen.
+  const [naLabels, setNaLabels] = useState<Set<string>>(new Set());
+  const camera = useCameraCapture();
 
   useEffect(() => {
     if (!propertyType) return;
@@ -64,50 +67,43 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
   const toggleChecklistItem = (label: string) => {
     setCheckedLabels(prev => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
+      if (next.has(label)) { next.delete(label); } else {
+        next.add(label);
+        setNaLabels(p => { if (!p.has(label)) return p; const n = new Set(p); n.delete(label); return n; });
+      }
+      return next;
+    });
+  };
+
+  const toggleNotApplicable = (label: string) => {
+    setNaLabels(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) { next.delete(label); } else {
+        next.add(label);
+        setCheckedLabels(p => { if (!p.has(label)) return p; const n = new Set(p); n.delete(label); return n; });
+      }
       return next;
     });
   };
 
   const startCamera = useCallback(async () => {
     setStep('camera');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch {
-      setUploadError('Kamera konnte nicht geöffnet werden.');
+    const ok = await camera.startCamera();
+    if (!ok) {
+      setUploadError(t(lang, 'cameraPermissionError'));
       setStep('intro');
     }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-  }, []);
+  }, [camera, lang]);
 
   const takePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const v = videoRef.current;
-    const c = canvasRef.current;
-    c.width = v.videoWidth;
-    c.height = v.videoHeight;
-    c.getContext('2d')?.drawImage(v, 0, 0);
-    setPhotoDataUrl(c.toDataURL('image/jpeg', 0.85));
-    stopCamera();
+    camera.takePhoto();
     setStep('preview');
-  }, [stopCamera]);
+  }, [camera]);
 
   const retakePhoto = useCallback(() => {
-    setPhotoDataUrl(null);
+    camera.clearPhoto();
     startCamera();
-  }, [startCamera]);
+  }, [camera, startCamera]);
 
   const getGPS = (): Promise<{ lat: number; lng: number } | null> =>
     new Promise(resolve => {
@@ -119,6 +115,7 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
     });
 
   const uploadAndCheckOut = useCallback(async () => {
+    const photoDataUrl = camera.photoDataUrl;
     if (!photoDataUrl) return;
     setStep('uploading');
     setUploadError('');
@@ -180,16 +177,18 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
           // IndexedDB unavailable too — fall through to the regular error below
         }
       }
-      setUploadError(err instanceof Error ? err.message : 'Fehler beim Auschecken');
+      setUploadError(err instanceof Error ? err.message : t(lang, 'checkOutError'));
       setStep('preview');
     }
-  }, [photoDataUrl, assignmentId, onSuccess, onQueued, checkedLabels]);
+  }, [camera.photoDataUrl, assignmentId, onSuccess, onQueued, checkedLabels, lang]);
 
-  const handleCancel = () => { stopCamera(); onCancel(); };
+  const handleCancel = () => { camera.stopCamera(); onCancel(); };
 
   const finalDuration = doneTime
     ? formatDuration(doneTime.getTime() - new Date(checkedInAt).getTime())
     : elapsedLabel;
+
+  const allItemsResolved = checkedLabels.size + naLabels.size >= checklistItems.length;
 
   return (
     <div className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 ${rtl ? 'text-right' : 'text-left'}`}>
@@ -199,8 +198,8 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
         {step === 'intro' && (
           <div className="p-7">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-[#0F172A]">Auschecken</h2>
-              <button onClick={handleCancel} className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors">
+              <h2 className="text-lg font-bold text-[#0F172A]">{t(lang, 'checkOut')}</h2>
+              <button onClick={handleCancel} aria-label={t(lang, 'ariaClose')} className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors">
                 <X size={18} className="text-[#94A3B8]" />
               </button>
             </div>
@@ -209,17 +208,17 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
               <p className="text-sm font-semibold text-[#0F172A]">{propertyName}</p>
               <div className="flex items-center gap-5 mt-3">
                 <div>
-                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">Eingecheckt</p>
-                  <p className="text-sm font-bold text-[#0F172A]">{checkedInTime} Uhr</p>
+                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">{t(lang, 'checkedIn')}</p>
+                  <p className="text-sm font-bold text-[#0F172A]">{checkedInTime} {t(lang, 'clock')}</p>
                 </div>
                 <div className="w-px h-8 bg-[#E2E8F0]" />
                 <div>
-                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">Jetzt</p>
-                  <p className="text-sm font-bold text-[#0F172A]">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</p>
+                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">{t(lang, 'nowLabel')}</p>
+                  <p className="text-sm font-bold text-[#0F172A]">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} {t(lang, 'clock')}</p>
                 </div>
                 <div className="w-px h-8 bg-[#E2E8F0]" />
                 <div>
-                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">Dauer</p>
+                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide mb-0.5">{t(lang, 'durationLabel')}</p>
                   <p className="text-sm font-bold text-[#22C55E]">{elapsedLabel}</p>
                 </div>
               </div>
@@ -229,9 +228,9 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
               <div className="w-20 h-20 rounded-3xl bg-[#FFF7ED] flex items-center justify-center mb-4">
                 <Camera size={36} className="text-[#F97316]" />
               </div>
-              <p className="text-sm font-semibold text-[#0F172A] text-center">Nachweis-Foto</p>
+              <p className="text-sm font-semibold text-[#0F172A] text-center">{t(lang, 'proofPhotoTitle')}</p>
               <p className="text-sm text-[#64748B] text-center mt-1">
-                Fotografiere den gereinigten Bereich als Nachweis der erledigten Arbeit.
+                {t(lang, 'photographCleanedArea')}
               </p>
             </div>
 
@@ -239,7 +238,7 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
 
             <button onClick={handleIntroContinue}
               className="w-full py-3.5 rounded-2xl text-sm font-semibold bg-[#F97316] text-white hover:bg-[#EA580C] transition-colors flex items-center justify-center gap-2">
-              <Camera size={16} /> Foto & Auschecken
+              <Camera size={16} /> {t(lang, 'photoAndCheckOutButton')}
             </button>
           </div>
         )}
@@ -251,7 +250,7 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
               <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                 <ListChecks size={19} className="text-[#F97316]" /> {t(lang, 'checklistTitle')}
               </h2>
-              <button onClick={handleCancel} className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors">
+              <button onClick={handleCancel} aria-label={t(lang, 'ariaClose')} className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors">
                 <X size={18} className="text-[#94A3B8]" />
               </button>
             </div>
@@ -260,32 +259,40 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
             <div className="space-y-2.5 mb-6">
               {checklistItems.map(item => {
                 const checked = checkedLabels.has(item.label);
+                const isNa = naLabels.has(item.label);
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    onClick={() => toggleChecklistItem(item.label)}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition-colors ${
-                      checked ? 'bg-[#FFF7ED] border-[#FED7AA]' : 'bg-[#F8FAFC] border-[#E2E8F0] hover:bg-[#F1F5F9]'
+                    className={`w-full flex items-center gap-2 px-4 py-3.5 rounded-xl border transition-colors ${
+                      checked ? 'bg-[#FFF7ED] border-[#FED7AA]' : isNa ? 'bg-[#F1F5F9] border-[#E2E8F0]' : 'bg-[#F8FAFC] border-[#E2E8F0] hover:bg-[#F1F5F9]'
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      checked ? 'bg-[#F97316] border-[#F97316]' : 'border-[#CBD5E1]'
-                    }`}>
-                      {checked && <Check size={13} className="text-white" strokeWidth={3} />}
-                    </div>
-                    <span className={`text-sm ${checked ? 'text-[#0F172A] font-medium' : 'text-[#475569]'}`}>{item.label}</span>
-                  </button>
+                    <button onClick={() => toggleChecklistItem(item.label)} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        checked ? 'bg-[#F97316] border-[#F97316]' : 'border-[#CBD5E1]'
+                      }`}>
+                        {checked && <Check size={13} className="text-white" strokeWidth={3} />}
+                      </div>
+                      <span className={`text-sm truncate ${checked ? 'text-[#0F172A] font-medium' : isNa ? 'text-[#94A3B8] line-through' : 'text-[#475569]'}`}>{item.label}</span>
+                    </button>
+                    <button
+                      onClick={() => toggleNotApplicable(item.label)}
+                      className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-colors ${isNa ? 'bg-[#94A3B8] text-white' : 'text-[#94A3B8] hover:bg-[#E2E8F0]'}`}
+                    >
+                      {t(lang, 'checklistNotApplicable')}
+                    </button>
+                  </div>
                 );
               })}
             </div>
 
             <p className="text-xs text-[#94A3B8] text-center mb-3">
-              {checkedLabels.size}/{checklistItems.length} {t(lang, 'checklistItemsDone')}
+              {checkedLabels.size + naLabels.size}/{checklistItems.length} {t(lang, 'checklistItemsDone')}
             </p>
 
             <button
               onClick={startCamera}
-              disabled={checkedLabels.size < checklistItems.length}
+              disabled={!allItemsResolved}
               className="w-full py-3.5 rounded-2xl text-sm font-semibold bg-[#F97316] text-white hover:bg-[#EA580C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {t(lang, 'checklistContinue')}
@@ -295,45 +302,33 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
 
         {/* Camera */}
         {step === 'camera' && (
-          <div className="relative bg-black" style={{ minHeight: '60dvh' }}>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full object-cover" style={{ maxHeight: '70dvh' }} />
-            <canvas ref={canvasRef} className="hidden" />
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-6 border-2 border-white/30 rounded-2xl" />
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full">
-                <p className="text-white text-xs font-semibold">Erledigten Bereich fotografieren</p>
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent">
-              <button onClick={handleCancel} className="w-12 h-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
-                <X size={20} className="text-white" />
-              </button>
-              <button onClick={takePhoto}
-                className="rounded-full bg-white border-4 border-white/30 shadow-lg flex items-center justify-center transition-transform active:scale-95"
-                style={{ width: 72, height: 72 }}>
-                <div className="w-14 h-14 rounded-full bg-white" />
-              </button>
-              <div className="w-12 h-12" />
-            </div>
-          </div>
+          <CameraCaptureView
+            videoRef={camera.videoRef}
+            canvasRef={camera.canvasRef}
+            label={t(lang, 'photographCompletedArea')}
+            onCancel={handleCancel}
+            onCapture={takePhoto}
+            cancelAriaLabel={t(lang, 'ariaClose')}
+            captureAriaLabel={t(lang, 'ariaTakePhoto')}
+          />
         )}
 
         {/* Preview */}
-        {step === 'preview' && photoDataUrl && (
+        {step === 'preview' && camera.photoDataUrl && (
           <div>
             <div className="relative">
-              <img src={photoDataUrl} alt="Nachweis-Foto" className="w-full object-cover" style={{ maxHeight: '55dvh' }} />
+              <img src={camera.photoDataUrl} alt={propertyName} className="w-full object-cover" style={{ maxHeight: '55dvh' }} />
             </div>
             <div className="p-6">
-              <h3 className="text-base font-bold text-[#0F172A] mb-1">Foto prüfen</h3>
-              <p className="text-sm text-[#64748B] mb-5">Ist die erledigte Arbeit gut erkennbar?</p>
+              <h3 className="text-base font-bold text-[#0F172A] mb-1">{t(lang, 'reviewPhotoTitle')}</h3>
+              <p className="text-sm text-[#64748B] mb-5">{t(lang, 'isWorkRecognizable')}</p>
               {uploadError && <p className="text-xs text-[#EF4444] mb-4">{uploadError}</p>}
               <div className="flex gap-3">
                 <button onClick={retakePhoto} className="flex-1 py-3.5 rounded-2xl text-sm font-semibold bg-[#F1F5F9] text-[#0F172A] hover:bg-[#E2E8F0] transition-colors flex items-center justify-center gap-2">
-                  <RotateCcw size={15} /> Nochmal
+                  <RotateCcw size={15} /> {t(lang, 'retakeButton')}
                 </button>
                 <button onClick={uploadAndCheckOut} className="flex-1 py-3.5 rounded-2xl text-sm font-semibold bg-[#F97316] text-white hover:bg-[#EA580C] transition-colors flex items-center justify-center gap-2">
-                  <Check size={15} /> Fertig
+                  <Check size={15} /> {t(lang, 'doneButton')}
                 </button>
               </div>
             </div>
@@ -344,8 +339,7 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
         {step === 'uploading' && (
           <div className="p-10 flex flex-col items-center justify-center" style={{ minHeight: '40dvh' }}>
             <Loader2 size={40} className="text-[#F97316] animate-spin mb-5" />
-            <p className="text-sm font-semibold text-[#0F172A]">Auschecken...</p>
-            <p className="text-xs text-[#94A3B8] mt-1">Foto wird hochgeladen</p>
+            <p className="text-sm font-semibold text-[#0F172A]">{t(lang, 'checkOut')}...</p>
             <p className="text-lg font-extrabold text-[#DC2626] text-center mt-5">{t(lang, 'dontCloseAppUploading')}</p>
           </div>
         )}
@@ -356,12 +350,12 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
             <div className="w-20 h-20 rounded-3xl bg-[#FFF7ED] flex items-center justify-center mb-5">
               <Check size={40} className="text-[#F97316]" />
             </div>
-            <p className="text-lg font-bold text-[#0F172A]">Fertig!</p>
+            <p className="text-lg font-bold text-[#0F172A]">{t(lang, 'doneExclaim')}</p>
             <div className="flex items-center gap-2 mt-2 bg-[#F8FAFC] rounded-xl px-4 py-2">
               <Clock size={14} className="text-[#94A3B8]" />
-              <p className="text-sm text-[#64748B]">Dauer: <span className="font-bold text-[#0F172A]">{finalDuration}</span></p>
+              <p className="text-sm text-[#64748B]">{t(lang, 'durationLabel')}: <span className="font-bold text-[#0F172A]">{finalDuration}</span></p>
             </div>
-            <p className="text-xs text-[#94A3B8] mt-2">Wird in der Abrechnung erfasst</p>
+            <p className="text-xs text-[#94A3B8] mt-2">{t(lang, 'recordedInPayroll')}</p>
           </div>
         )}
 
@@ -371,13 +365,13 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
             <div className="w-20 h-20 rounded-3xl bg-[#FFF7ED] flex items-center justify-center mb-5">
               <CloudOff size={40} className="text-[#F97316]" />
             </div>
-            <p className="text-lg font-bold text-[#0F172A]">Fertig!</p>
+            <p className="text-lg font-bold text-[#0F172A]">{t(lang, 'doneExclaim')}</p>
             <div className="flex items-center gap-2 mt-2 bg-[#F8FAFC] rounded-xl px-4 py-2">
               <Clock size={14} className="text-[#94A3B8]" />
-              <p className="text-sm text-[#64748B]">Dauer: <span className="font-bold text-[#0F172A]">{finalDuration}</span></p>
+              <p className="text-sm text-[#64748B]">{t(lang, 'durationLabel')}: <span className="font-bold text-[#0F172A]">{finalDuration}</span></p>
             </div>
             <p className="text-xs text-[#94A3B8] mt-2 max-w-[240px]">
-              Kein Internet gerade — wird automatisch gesendet, sobald du wieder online bist.
+              {t(lang, 'noInternetCheckOutQueued')}
             </p>
           </div>
         )}
