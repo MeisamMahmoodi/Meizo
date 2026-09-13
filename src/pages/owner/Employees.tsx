@@ -30,7 +30,25 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [loginEnabled, setLoginEnabled] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Employee | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<{ assignments: number; futureAssignments: number } | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
   const { addToast } = useToast();
+
+  // Zeigt in der Löschbestätigung die echte Anzahl betroffener Einsätze an,
+  // statt nur einem allgemeinen Warnsatz — damit man vor dem Löschen sieht,
+  // wie viel tatsächlich mit verschwindet (v.a. zukünftig geplante Einsätze).
+  useEffect(() => {
+    if (!deleteConfirm) { setDeleteImpact(null); return; }
+    setLoadingImpact(true);
+    const today = toLocalDateStr(new Date());
+    Promise.all([
+      supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('employee_id', deleteConfirm.id),
+      supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('employee_id', deleteConfirm.id).gte('date', today),
+    ]).then(([totalRes, futureRes]) => {
+      setDeleteImpact({ assignments: totalRes.count ?? 0, futureAssignments: futureRes.count ?? 0 });
+      setLoadingImpact(false);
+    });
+  }, [deleteConfirm]);
 
   // Kein Plan-/Limit-Konzept mehr — jede Firma hat alle Funktionen, der
   // Preis skaliert automatisch mit der Mitarbeiterzahl (siehe lib/plans.ts).
@@ -518,9 +536,22 @@ const handleDelete = async (emp: Employee) => {
             <Trash2 size={22} className="text-[#EF4444]" />
           </div>
           <h2 className="text-lg font-bold text-[#0F172A] mb-2">Mitarbeiter löschen?</h2>
-          <p className="text-sm text-[#64748B] leading-relaxed mb-8">
+          <p className="text-sm text-[#64748B] leading-relaxed mb-3">
             {deleteConfirm?.first_name} {deleteConfirm?.last_name} wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
           </p>
+          {loadingImpact ? (
+            <p className="text-xs text-[#94A3B8] mb-8">Prüfe verknüpfte Einsätze...</p>
+          ) : deleteImpact && deleteImpact.assignments > 0 ? (
+            <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-3.5 mb-8 flex items-start gap-2.5">
+              <AlertCircle size={15} className="text-[#EF4444] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#EF4444] leading-relaxed">
+                Dabei werden auch <strong>{deleteImpact.assignments} {deleteImpact.assignments === 1 ? 'Einsatz' : 'Einsätze'}</strong> gelöscht
+                {deleteImpact.futureAssignments > 0 && <> — davon <strong>{deleteImpact.futureAssignments} in der Zukunft</strong></>}.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-8" />
+          )}
           <div className="flex justify-end gap-3">
             <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">Abbrechen</button>
             <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="btn-danger">Löschen</button>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, MapPin, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2, Search } from 'lucide-react';
+import { Plus, MapPin, Pencil, Trash2, Building2, GraduationCap, ShoppingCart, HeartPulse, CalendarPlus, Euro, Link2, Search, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { useToast } from '../../components/shared/Toast';
@@ -8,6 +8,7 @@ import { SortSelect } from '../../components/shared/SortSelect';
 import { ActionMenu } from '../../components/shared/ActionMenu';
 import type { ActionMenuItem } from '../../components/shared/ActionMenu';
 import type { AddressValue } from '../../components/shared/AddressAutocomplete';
+import { toLocalDateStr } from '../../lib/utils';
 import type { Property, Company } from '../../lib/types';
 
 interface PropertiesProps {
@@ -31,10 +32,28 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
   const [editModal, setEditModal] = useState<Property | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Property | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<{ assignments: number; futureAssignments: number; employees: number } | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'newest'>('name');
   const { addToast } = useToast();
+
+  // Zeigt in der Löschbestätigung die echte Anzahl betroffener Einsätze und
+  // zugewiesener Mitarbeiter an, statt nur einem allgemeinen Warnsatz.
+  useEffect(() => {
+    if (!deleteConfirm) { setDeleteImpact(null); return; }
+    setLoadingImpact(true);
+    const today = toLocalDateStr(new Date());
+    Promise.all([
+      supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('property_id', deleteConfirm.id),
+      supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('property_id', deleteConfirm.id).gte('date', today),
+      supabase.from('employee_properties').select('id', { count: 'exact', head: true }).eq('property_id', deleteConfirm.id),
+    ]).then(([totalRes, futureRes, empRes]) => {
+      setDeleteImpact({ assignments: totalRes.count ?? 0, futureAssignments: futureRes.count ?? 0, employees: empRes.count ?? 0 });
+      setLoadingImpact(false);
+    });
+  }, [deleteConfirm]);
 
   const [newName, setNewName] = useState('');
   const [newAddress, setNewAddress] = useState<AddressValue>({ formatted: '', lat: null, lng: null });
@@ -299,9 +318,29 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
             <Trash2 size={22} className="text-[#EF4444]" />
           </div>
           <h2 className="text-lg font-bold text-[#0F172A] mb-2">Objekt löschen?</h2>
-          <p className="text-sm text-[#64748B] leading-relaxed mb-8">
-            „{deleteConfirm?.name}" wird unwiderruflich gelöscht. Alle zugehörigen Einsätze und Zuweisungen werden ebenfalls entfernt. Diese Aktion kann nicht rückgängig gemacht werden.
+          <p className="text-sm text-[#64748B] leading-relaxed mb-3">
+            „{deleteConfirm?.name}" wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
           </p>
+          {loadingImpact ? (
+            <p className="text-xs text-[#94A3B8] mb-8">Prüfe verknüpfte Daten...</p>
+          ) : deleteImpact && (deleteImpact.assignments > 0 || deleteImpact.employees > 0) ? (
+            <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-3.5 mb-8 flex items-start gap-2.5">
+              <AlertCircle size={15} className="text-[#EF4444] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#EF4444] leading-relaxed">
+                Dabei werden auch{' '}
+                {deleteImpact.assignments > 0 && (
+                  <><strong>{deleteImpact.assignments} {deleteImpact.assignments === 1 ? 'Einsatz' : 'Einsätze'}</strong>{deleteImpact.futureAssignments > 0 && <> (davon {deleteImpact.futureAssignments} in der Zukunft)</>}</>
+                )}
+                {deleteImpact.assignments > 0 && deleteImpact.employees > 0 && ' sowie '}
+                {deleteImpact.employees > 0 && (
+                  <><strong>{deleteImpact.employees} Mitarbeiter-Zuweisung{deleteImpact.employees === 1 ? '' : 'en'}</strong></>
+                )}
+                {' '}entfernt.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-8" />
+          )}
           <div className="flex justify-end gap-3">
             <button onClick={() => setDeleteConfirm(null)} className="btn-ghost">Abbrechen</button>
             <button onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="btn-danger">Löschen</button>
