@@ -89,6 +89,10 @@ export type TranslationKeys = {
   sickConfirmYes: string;
   sickConfirmNo: string;
   cancelUploadButton: string;
+  markHealthyError: string;
+  acceptReplacementError: string;
+  declineReplacementError: string;
+  gpsCheckInAnywayButton: string;
   youAreSick: string;
   markAsHealthy: string;
   sickSince: string;
@@ -220,6 +224,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Ja, krank melden',
     sickConfirmNo: 'Abbrechen',
     cancelUploadButton: 'Abbrechen',
+    markHealthyError: 'Fehler beim Gesundmelden',
+    acceptReplacementError: 'Fehler beim Annehmen der Anfrage',
+    declineReplacementError: 'Fehler beim Ablehnen der Anfrage',
+    gpsCheckInAnywayButton: 'Trotzdem einchecken',
     youAreSick: 'Du bist krankgemeldet',
     markAsHealthy: 'Ich bin wieder gesund',
     sickSince: 'Krank seit',
@@ -349,6 +357,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Da, declar bolnav',
     sickConfirmNo: 'Anuleaza',
     cancelUploadButton: 'Anuleaza',
+    markHealthyError: 'Eroare la anuntarea insanatosirii',
+    acceptReplacementError: 'Eroare la acceptarea cererii',
+    declineReplacementError: 'Eroare la refuzarea cererii',
+    gpsCheckInAnywayButton: 'Check-in oricum',
     youAreSick: 'Esti in concediu medical',
     markAsHealthy: 'Sunt din nou sanatos',
     sickSince: 'Bolnav din',
@@ -478,6 +490,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'نعم، إبلاغ عن مرض',
     sickConfirmNo: 'إلغاء',
     cancelUploadButton: 'إلغاء',
+    markHealthyError: 'خطأ في تسجيل الشفاء',
+    acceptReplacementError: 'خطأ في قبول الطلب',
+    declineReplacementError: 'خطأ في رفض الطلب',
+    gpsCheckInAnywayButton: 'تسجيل الدخول على أي حال',
     youAreSick: 'أنت مبلغ عن مرضك',
     markAsHealthy: 'أنا بصحة جيدة الآن',
     sickSince: 'مريض منذ',
@@ -607,6 +623,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Tak, zglos chorobe',
     sickConfirmNo: 'Anuluj',
     cancelUploadButton: 'Anuluj',
+    markHealthyError: 'Blad podczas zglaszania powrotu do zdrowia',
+    acceptReplacementError: 'Blad podczas akceptacji prosby',
+    declineReplacementError: 'Blad podczas odrzucania prosby',
+    gpsCheckInAnywayButton: 'Zamelduj mimo to',
     youAreSick: 'Jestes na zwolnieniu chorobowym',
     markAsHealthy: 'Jestem znowu zdrow',
     sickSince: 'Chory od',
@@ -736,6 +756,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Yes, report sick',
     sickConfirmNo: 'Cancel',
     cancelUploadButton: 'Cancel',
+    markHealthyError: 'Error while marking as healthy',
+    acceptReplacementError: 'Error while accepting the request',
+    declineReplacementError: 'Error while declining the request',
+    gpsCheckInAnywayButton: 'Check in anyway',
     youAreSick: 'You are reported sick',
     markAsHealthy: 'I am healthy again',
     sickSince: 'Sick since',
@@ -865,6 +889,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Так, повідомити про хворобу',
     sickConfirmNo: 'Скасувати',
     cancelUploadButton: 'Скасувати',
+    markHealthyError: 'Помилка при позначенні одужання',
+    acceptReplacementError: 'Помилка при прийнятті запиту',
+    declineReplacementError: 'Помилка при відхиленні запиту',
+    gpsCheckInAnywayButton: 'Все одно зареєструватися',
     youAreSick: 'Тебе позначено як хворого(у)',
     markAsHealthy: 'Я знову здоровий(а)',
     sickSince: 'Хворію з',
@@ -994,6 +1022,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Evet, hastalık bildir',
     sickConfirmNo: 'İptal',
     cancelUploadButton: 'İptal',
+    markHealthyError: 'Iyilesme bildirilirken hata olustu',
+    acceptReplacementError: 'Talep kabul edilirken hata olustu',
+    declineReplacementError: 'Talep reddedilirken hata olustu',
+    gpsCheckInAnywayButton: 'Yine de giris yap',
     youAreSick: 'Hasta olarak bildirildin',
     markAsHealthy: 'Tekrar sağlıklıyım',
     sickSince: 'Hastalık başlangıcı',
@@ -1123,6 +1155,10 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmYes: 'Да, съобщи болест',
     sickConfirmNo: 'Отказ',
     cancelUploadButton: 'Отказ',
+    markHealthyError: 'Грешка при отбелязване на оздравяване',
+    acceptReplacementError: 'Грешка при приемане на заявката',
+    declineReplacementError: 'Грешка при отказване на заявката',
+    gpsCheckInAnywayButton: 'Настани се въпреки това',
     youAreSick: 'Отбелязан(а) си като болен(на)',
     markAsHealthy: 'Отново съм здрав(а)',
     sickSince: 'Болен(на) от',

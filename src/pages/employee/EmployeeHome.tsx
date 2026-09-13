@@ -9,6 +9,8 @@ import { CheckInFlow } from '../../components/employee/CheckInFlow';
 import { CheckOutFlow } from '../../components/employee/CheckOutFlow';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { useToast } from '../../components/shared/Toast';
+import { setSwUpdateBusy } from '../../lib/swUpdate';
 import type { Employee, Property, Assignment, ReplacementRequest, Notification, SickReport } from '../../lib/types';
 
 interface EmployeeHomeProps {
@@ -24,6 +26,7 @@ interface AssignmentWithProperty extends Assignment {
 export function EmployeeHome({ onSickLeave }: EmployeeHomeProps) {
   const { user, signOut } = useAuth();
   const { lang, setLang, t, rtl } = useLang();
+  const { addToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications(employee?.id ?? null);
@@ -52,6 +55,17 @@ export function EmployeeHome({ onSickLeave }: EmployeeHomeProps) {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Waehrend ein Check-in/-out-Vorgang laeuft (GPS-Lock, Kamera, Upload),
+  // soll ein im Hintergrund bereits aktiver neuer Service Worker die Seite
+  // nicht per Reload unterbrechen — siehe src/lib/swUpdate.ts.
+  useEffect(() => {
+    setSwUpdateBusy(showCheckInFlow || showCheckOutFlow);
+  }, [showCheckInFlow, showCheckOutFlow]);
+
+  useEffect(() => {
+    return () => setSwUpdateBusy(false);
   }, []);
 
   const today = new Date();
@@ -204,19 +218,25 @@ const { data: upcoming } = await supabase
     setMarkingHealthy(true);
     try {
       const todayStr = toLocalDateStr(new Date());
-await supabase.from('sick_reports').delete()
-  .eq('employee_id', employee.id)
-  .lte('date', todayStr)
-  .or(`date_to.gte.${todayStr},date_to.is.null`);
+      // Beide Fehler werden jetzt geprueft — vorher wurde bei einem
+      // Fehlschlag trotzdem "gesund" angezeigt (setSickReports([])), obwohl
+      // der Server-Stand unveraendert war und z.B. das Dashboard weiterhin
+      // "krank" zeigte.
+      const { error: e1 } = await supabase.from('sick_reports').delete()
+        .eq('employee_id', employee.id)
+        .lte('date', todayStr)
+        .or(`date_to.gte.${todayStr},date_to.is.null`);
+      if (e1) { addToast(t('markHealthyError'), 'error'); return; }
 
-      await supabase
+      const { error: e2 } = await supabase
         .from('employees')
         .update({ status: 'active' })
         .eq('id', employee.id);
+      if (e2) { addToast(t('markHealthyError'), 'error'); return; }
 
       setSickReports([]);
     } catch {
-      // Handle error silently
+      addToast(t('markHealthyError'), 'error');
     } finally {
       setMarkingHealthy(false);
     }
@@ -229,8 +249,8 @@ await supabase.from('sick_reports').delete()
     setRespondingReplacement(true);
     try {
       const { error: e1 } = await supabase.from('replacement_requests').update({ status: 'accepted' }).eq('id', replacementRequest.id);
-      if (e1) return;
-      await supabase.from('assignments').insert({
+      if (e1) { addToast(t('acceptReplacementError'), 'error'); return; }
+      const { error: e2 } = await supabase.from('assignments').insert({
         property_id: replacementRequest.property_id,
         employee_id: employee.id,
         date: todayStr,
@@ -238,7 +258,17 @@ await supabase.from('sick_reports').delete()
         time_from: replacementRequest.property?.time_from ?? null,
         time_to: replacementRequest.property?.time_to ?? null,
       });
+      if (e2) {
+        // Anfrage war schon "accepted", aber der Einsatz selbst konnte nicht
+        // angelegt werden — zurueck auf "pending" setzen, statt stillschweigend
+        // eine Anfrage als erledigt zu markieren, zu der es keinen Einsatz gibt.
+        await supabase.from('replacement_requests').update({ status: 'pending' }).eq('id', replacementRequest.id);
+        addToast(t('acceptReplacementError'), 'error');
+        return;
+      }
       setRequestResponded(true);
+    } catch {
+      addToast(t('acceptReplacementError'), 'error');
     } finally {
       setRespondingReplacement(false);
     }
@@ -248,8 +278,11 @@ await supabase.from('sick_reports').delete()
     if (!replacementRequest || respondingReplacement) return;
     setRespondingReplacement(true);
     try {
-      await supabase.from('replacement_requests').update({ status: 'declined' }).eq('id', replacementRequest.id);
+      const { error } = await supabase.from('replacement_requests').update({ status: 'declined' }).eq('id', replacementRequest.id);
+      if (error) { addToast(t('declineReplacementError'), 'error'); return; }
       setRequestResponded(true);
+    } catch {
+      addToast(t('declineReplacementError'), 'error');
     } finally {
       setRespondingReplacement(false);
     }

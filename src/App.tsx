@@ -253,6 +253,12 @@ function AppRoutes() {
   const [role, setRole] = useState<'owner' | 'employee' | 'admin' | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  // Unterscheidet "die Profil-Abfrage brauchte laenger als das Timeout"
+  // (Verbindung langsam, Abfrage laeuft evtl. noch im Hintergrund weiter)
+  // von einem echten "kein Profil vorhanden" — vorher zeigte beides dieselbe
+  // beunruhigende "Kein Profil gefunden"-Meldung mit Abmelden-Button, obwohl
+  // sich die Ansicht bei langsamem Netz oft von selbst korrigiert haette.
+  const [roleFetchTimedOut, setRoleFetchTimedOut] = useState(false);
   const [ownerCompany, setOwnerCompany] = useState<(Company & { paid_until: string | null }) | null | undefined>(undefined);
   const [suspended, setSuspended] = useState(false);
   const prevUserId = React.useRef<string | null>(null);
@@ -290,8 +296,18 @@ function AppRoutes() {
     setSuspended(false);
 
     setRoleLoading(true);
+    setRoleFetchTimedOut(false);
 
-    const timeout = setTimeout(() => setRoleLoading(false), 3000);
+    // Vorher 3000ms: auf einer langsamen Verbindung (Hotel-WLAN, mobile
+    // Daten) lief dieses Timeout oft ab, bevor die Profil-Abfrage fertig
+    // war, und der Nutzer sah kurz "Kein Profil gefunden" mit Abmelden-
+    // Button, obwohl gar nichts kaputt war. Grosszuegigerer Wert, und wenn
+    // es doch abläuft, wird das separat vermerkt (roleFetchTimedOut) statt
+    // wie ein echtes "kein Profil" behandelt zu werden.
+    const timeout = setTimeout(() => {
+      setRoleLoading(false);
+      setRoleFetchTimedOut(true);
+    }, 8000);
 
     (async () => {
       try {
@@ -323,6 +339,9 @@ function AppRoutes() {
       } finally {
         clearTimeout(timeout);
         setRoleLoading(false);
+        // Die Abfrage ist wirklich fertig (Erfolg oder Fehler) — das ist ein
+        // echtes Ergebnis, kein Timeout-Ratespiel mehr.
+        setRoleFetchTimedOut(false);
       }
     })();
 
@@ -436,7 +455,7 @@ function AppRoutes() {
     );
   }
 
-  return <NoProfileScreen user={user} signOut={signOut} />;
+  return <NoProfileScreen user={user} signOut={signOut} timedOut={roleFetchTimedOut} />;
 }
 
 // Shown when someone is authenticated but has no profiles row yet. Covers
@@ -448,7 +467,7 @@ function AppRoutes() {
 //    Google-authenticated session without a profile is by definition new).
 // 2. A genuinely orphaned account (e.g. an employee whose profile got
 //    deleted) — falls back to the original error message.
-function NoProfileScreen({ user, signOut }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; signOut: () => Promise<void> }) {
+function NoProfileScreen({ user, signOut, timedOut }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; signOut: () => Promise<void>; timedOut?: boolean }) {
   const pendingCompanyName = (user.user_metadata?.pending_company_name as string | undefined)?.trim();
   const isFreshGoogleLogin = !pendingCompanyName && user.app_metadata?.provider === 'google';
 
@@ -519,6 +538,22 @@ function NoProfileScreen({ user, signOut }: { user: NonNullable<ReturnType<typeo
               {loading ? 'Wird erstellt...' : 'Konto erstellen'}
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (timedOut && !failed) {
+    // Das war nur ein Timeout, kein bestaetigtes "kein Profil" - die Abfrage
+    // laeuft evtl. noch. Bewusst weniger alarmierend als die Meldung unten
+    // (kein Abmelden-Button), da ein Reload das meistens von selbst loest.
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-6">
+        <div className="text-center space-y-4">
+          <p className="text-ink-500 text-sm">Das dauert gerade länger als gewöhnlich. Bitte prüfe deine Internetverbindung.</p>
+          <button onClick={() => window.location.reload()} className="btn-primary">
+            Erneut versuchen
+          </button>
         </div>
       </div>
     );

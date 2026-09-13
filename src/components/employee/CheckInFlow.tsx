@@ -305,6 +305,17 @@ export function CheckInFlow({
                   <Camera size={16} /> {t(lang, 'photographBuilding')}
                 </button>
               )}
+              {gpsState === 'error' && (
+                // Vorher blockierte ein GPS-Fehler (Berechtigung verweigert,
+                // Timeout — z.B. im Keller) den Check-in komplett, ohne jeden
+                // Ausweg ausser endlosem "erneut versuchen". Genau wie beim
+                // "unverified"-Fall (Adresse nicht geocodebar) soll der
+                // Check-in trotzdem moeglich sein, nur ehrlich ungeprueft.
+                <button onClick={startCamera}
+                  className="w-full py-3 rounded-2xl text-xs font-semibold text-[#94A3B8] hover:text-[#64748B] hover:bg-[#F8FAFC] transition-colors flex items-center justify-center gap-2">
+                  {t(lang, 'gpsCheckInAnywayButton')}
+                </button>
+              )}
               {gpsState === 'too_far' && (
                 <p className="text-xs text-center text-[#94A3B8]">
                   {t(lang, 'mustBeOnSiteToCheckIn')}
