@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lock, Eye, EyeOff, Package, Users, FileSpreadsheet, Search } from 'lucide-react';
+import { Lock, Eye, EyeOff, Package, Users, FileSpreadsheet, Search, ListChecks } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/shared/Toast';
 import { calculateMonthlyPrice } from '../../lib/plans';
@@ -29,6 +29,17 @@ export function Settings({ company, onRefresh }: SettingsProps) {
 
   const [autoDispatchEnabled, setAutoDispatchEnabled] = useState(company.auto_dispatch_enabled);
   const [savingAutoDispatch, setSavingAutoDispatch] = useState(false);
+
+  // Tabs statt einer langen Karten-Liste — damit Einstellungen mit der Zeit
+  // wachsen können, ohne dass man sich durch die ganze Seite scrollen muss.
+  const tabs = [
+    { key: 'allgemein', label: 'Allgemein', icon: Package },
+    { key: 'automatisierung', label: 'Automatisierung', icon: Search },
+    { key: 'abrechnung', label: 'DATEV-Export', icon: FileSpreadsheet },
+    { key: 'sicherheit', label: 'Sicherheit', icon: Lock },
+    { key: 'checklisten', label: 'Checklisten', icon: ListChecks },
+  ] as const;
+  const [activeTab, setActiveTab] = useState<typeof tabs[number]['key']>('allgemein');
 
   const { addToast } = useToast();
 
@@ -118,9 +129,23 @@ export function Settings({ company, onRefresh }: SettingsProps) {
 
   return (
     <div>
-      <h1 className="text-2xl sm:text-[28px] font-bold text-ink-900 tracking-tight mb-8">Einstellungen</h1>
+      <h1 className="text-2xl sm:text-[28px] font-bold text-ink-900 tracking-tight mb-6">Einstellungen</h1>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-6">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${activeTab === tab.key ? 'bg-[#0F172A] text-white shadow-sm' : 'bg-white text-[#64748B] hover:bg-[#F8FAFC] border border-[#E2E8F0]/60'}`}
+          >
+            <tab.icon size={14} /> {tab.label}
+          </button>
+        ))}
+      </div>
 
       <div className="space-y-6 max-w-lg">
+        {activeTab === 'allgemein' && (
+          <>
         {/* Preis & Team */}
         <div className="rounded-2xl border p-6 sm:p-7 bg-[#F0FDF4] border-[#BBF7D0]">
           <div className="flex items-start justify-between gap-4">
@@ -174,8 +199,11 @@ export function Settings({ company, onRefresh }: SettingsProps) {
             {saving ? 'Speichern...' : 'Speichern'}
           </button>
         </div>
+          </>
+        )}
 
-        {/* Automatische Ersatzsuche */}
+        {activeTab === 'automatisierung' && (
+        /* Automatische Ersatzsuche */
         <div className="card p-6 sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-base font-semibold text-ink-900 flex items-center gap-2.5">
@@ -196,8 +224,10 @@ export function Settings({ company, onRefresh }: SettingsProps) {
             Wenn aktiviert, fragt meizo bei einer Krankmeldung automatisch verfügbare Mitarbeiter nacheinander an, bevorzugt werden Mitarbeiter, die das Objekt schon kennen, und wer in den letzten 30 Tagen am seltensten gefragt wurde. Jeder Kandidat hat 5 Minuten Zeit zu antworten, danach wird automatisch der nächste gefragt. Ist es aus, musst du Ersatz weiterhin manuell über "Ersatz finden" anfragen.
           </p>
         </div>
+        )}
 
-        {/* DATEV Export */}
+        {activeTab === 'abrechnung' && (
+        /* DATEV Export */
         <div className="card p-6 sm:p-8">
           <h2 className="text-base font-semibold text-ink-900 mb-2 flex items-center gap-2.5">
             <FileSpreadsheet size={18} className="text-ink-500" /> DATEV-Export einrichten
@@ -223,8 +253,10 @@ export function Settings({ company, onRefresh }: SettingsProps) {
             {savingDatev ? 'Speichern...' : 'Speichern'}
           </button>
         </div>
+        )}
 
-        {/* Password Change */}
+        {activeTab === 'sicherheit' && (
+        /* Password Change */
         <div className="card p-6 sm:p-8">
           <h2 className="text-base font-semibold text-ink-900 mb-5 flex items-center gap-2.5">
             <Lock size={18} className="text-ink-500" /> Passwort ändern
@@ -265,9 +297,12 @@ export function Settings({ company, onRefresh }: SettingsProps) {
             {savingPassword ? 'Wird geändert...' : 'Passwort ändern'}
           </button>
         </div>
+        )}
 
-        {/* Checklists */}
-        <ChecklistSettings company={company} />
+        {activeTab === 'checklisten' && (
+          /* Checklists */
+          <ChecklistSettings company={company} />
+        )}
       </div>
     </div>
   );
