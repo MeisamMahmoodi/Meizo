@@ -29,7 +29,10 @@ export function EmployeeHome({ onSickLeave }: EmployeeHomeProps) {
   const { addToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
-  const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications(employee?.id ?? null);
+  const { permission, subscribed, loading: pushLoading, error: pushError, subscribe, unsubscribe } = usePushNotifications(employee?.id ?? null);
+  useEffect(() => {
+    if (pushError) addToast(pushError, 'error');
+  }, [pushError, addToast]);
   const { pendingCount } = useOfflineSync(() => loadData());
   const [todayAssignment, setTodayAssignment] = useState<AssignmentWithProperty | null>(null);
   const [upcomingAssignments, setUpcomingAssignments] = useState<AssignmentWithProperty[]>([]);

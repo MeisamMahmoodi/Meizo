@@ -10,12 +10,29 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
+// Wartet auf navigator.serviceWorker.ready, aber nicht ewig. Vorher: ohne
+// aktiven/registrierten Service Worker (z.B. normaler Browser-Tab statt
+// installierter PWA, oder eine fehlgeschlagene SW-Registrierung) haengte
+// dieses Promise fuer immer, der "Aktivieren"-Button blieb dauerhaft im
+// Ladezustand haengen, ohne jede Rueckmeldung fuer den Mitarbeiter.
+function serviceWorkerReadyWithTimeout(timeoutMs = 8000): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Service Worker nicht bereit (Timeout)')), timeoutMs);
+    }),
+  ]);
+}
+
 export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported';
 
 export function usePushNotifications(employeeId: string | null) {
   const [permission, setPermission] = useState<PushPermission>('default');
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Grund fuer ein fehlgeschlagenes subscribe() — vorher gab es dafuer keine
+  // sichtbare Rueckmeldung, der Button schien einfach nichts zu tun.
+  const [error, setError] = useState<string | null>(null);
 
   // Check current state on mount and sync browser subscription to DB
   useEffect(() => {
@@ -58,18 +75,29 @@ export function usePushNotifications(employeeId: string | null) {
         .select('id')
         .eq('employee_id', employeeId)
         .maybeSingle()
-        .then(({ data, error }) => {
-          if (error) console.error('Push subscription check failed:', error);
+        .then(({ data, error: dbError }) => {
+          if (dbError) console.error('Push subscription check failed:', dbError);
           setSubscribed(!!data);
         });
     }
   }, [employeeId]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
-    if (!employeeId || !VAPID_PUBLIC_KEY) return false;
+    if (!employeeId) return false;
+    setError(null);
+
+    // Vorher: dieser Fall gab direkt "false" zurueck, ohne setLoading(true)
+    // je aufzurufen und ohne jede Fehlermeldung — der Button reagierte nach
+    // aussen so, als waere gar nichts passiert.
+    if (!VAPID_PUBLIC_KEY) {
+      console.error('Push-Benachrichtigungen: VITE_VAPID_PUBLIC_KEY ist nicht gesetzt.');
+      setError('Benachrichtigungen sind auf diesem Server aktuell nicht eingerichtet.');
+      return false;
+    }
+
     setLoading(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await serviceWorkerReadyWithTimeout();
 
       // Request permission
       const perm = await Notification.requestPermission();
@@ -88,17 +116,18 @@ export function usePushNotifications(employeeId: string | null) {
       const auth = json.keys!.auth!;
 
       // Save to DB (upsert — handles re-subscription)
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from('push_subscriptions')
         .upsert({ employee_id: employeeId, endpoint, p256dh, auth, updated_at: new Date().toISOString() },
           { onConflict: 'employee_id' });
 
-      if (error) throw error;
+      if (dbError) throw dbError;
       setSubscribed(true);
       setLoading(false);
       return true;
     } catch (err) {
       console.error('Push subscribe failed:', err);
+      setError('Benachrichtigungen konnten nicht aktiviert werden. Bitte versuche es erneut.');
       setLoading(false);
       return false;
     }
@@ -117,7 +146,7 @@ export function usePushNotifications(employeeId: string | null) {
     }
   }, [employeeId]);
 
-  return { permission, subscribed, loading, subscribe, unsubscribe };
+  return { permission, subscribed, loading, error, subscribe, unsubscribe };
 }
 
 // Utility: send a push notification from the owner side (calls edge function)

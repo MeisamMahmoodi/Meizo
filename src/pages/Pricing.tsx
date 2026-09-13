@@ -122,12 +122,28 @@ export function Pricing({ onContinue }: PricingProps) {
               })}
             </ul>
 
-            <a
-              href={`mailto:meisam@meizo.de?subject=${mailSubject}&body=${mailBody}`}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold text-center transition-all duration-200 block bg-[#0F172A] text-white hover:bg-[#1E293B]"
-            >
-              {enterprise ? 'Angebot anfragen' : 'Jetzt anfragen'}
-            </a>
+            {/* Vorher fuer beide Faelle ein mailto-Link mit dem Text
+                "Jetzt anfragen" — auch fuer die normale Selbstbedienungs-
+                Preisstufe, wo eigentlich niemand erst eine E-Mail schreiben
+                soll, sondern sich direkt selbst ein Konto anlegen kann.
+                Nur oberhalb von ENTERPRISE_THRESHOLD (siehe plans.ts) gibt es
+                laut eigener Preislogik kein automatisches Self-Checkout,
+                dort bleibt der mailto-Kontakt richtig. */}
+            {enterprise ? (
+              <a
+                href={`mailto:meisam@meizo.de?subject=${mailSubject}&body=${mailBody}`}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-center transition-all duration-200 block bg-[#0F172A] text-white hover:bg-[#1E293B]"
+              >
+                Angebot anfragen
+              </a>
+            ) : (
+              <a
+                href="/register"
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-center transition-all duration-200 block bg-[#0F172A] text-white hover:bg-[#1E293B]"
+              >
+                Kostenloses Konto erstellen und testen
+              </a>
+            )}
           </div>
 
           {/* Wechsel-Garantie */}

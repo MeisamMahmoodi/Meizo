@@ -278,7 +278,7 @@ export function CheckOutFlow({ assignmentId, propertyName, propertyType, checked
                       }`}>
                         {checked && <Check size={13} className="text-white" strokeWidth={3} />}
                       </div>
-                      <span className={`text-sm truncate ${checked ? 'text-[#0F172A] font-medium' : isNa ? 'text-[#94A3B8] line-through' : 'text-[#475569]'}`}>{item.label}</span>
+                      <span className={`text-sm break-words ${checked ? 'text-[#0F172A] font-medium' : isNa ? 'text-[#94A3B8] line-through' : 'text-[#475569]'}`}>{item.label}</span>
                     </button>
                     <button
                       onClick={() => toggleNotApplicable(item.label)}
