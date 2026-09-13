@@ -109,7 +109,7 @@ function HeroVisual() {
         {!solved ? (
           <p className="text-sm font-semibold text-[#9A3412]">🔍 meizo sucht automatisch einen Ersatz …</p>
         ) : (
-          <p className="text-sm font-bold text-[#15803D]">✓ Fatima übernimmt — 90 Sekunden später</p>
+          <p className="text-sm font-bold text-[#15803D]">✓ Fatima übernimmt — automatisch bestätigt</p>
         )}
       </div>
     </div>
@@ -189,8 +189,8 @@ function StatsSection() {
         </div>
         <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-6 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-[#15803D] mb-2">Mit meizo</p>
-          <p className="text-5xl font-extrabold text-[#16A34A] tracking-tight">90 Sek.</p>
-          <p className="text-sm text-[#15803D] mt-2">Ein Klick, Ersatz bestätigt</p>
+          <p className="text-5xl font-extrabold text-[#16A34A] tracking-tight">1 Klick.</p>
+          <p className="text-sm text-[#15803D] mt-2">App fragt automatisch reihum an, bis wer zusagt</p>
         </div>
       </div>
     </RevealOnScroll>
