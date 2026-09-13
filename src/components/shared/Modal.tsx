@@ -25,44 +25,60 @@ export function Modal({ open, onClose, children, width = 'max-w-lg', ariaLabel, 
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Nur beim tatsaechlichen Oeffnen/Schliessen ausfuehren (Abhaengigkeit
+  // ausschliesslich `open`). Vorher hing dieser Effekt zusaetzlich an
+  // onClose/dismissible — die meisten Aufrufer uebergeben onClose als Inline-
+  // Funktion, die bei jedem Render des Elternteils eine neue Referenz ist.
+  // Jeder Tastendruck in einem Formularfeld im Dialog liess dadurch das
+  // Elternteil neu rendern und diesen Effekt erneut laufen, was per
+  // setTimeout den Fokus zurueck auf das erste fokussierbare Element (den
+  // X-Button) gerissen hat — man wurde bei jedem Zeichen aus dem Eingabefeld
+  // geworfen.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      previouslyFocused.current = document.activeElement as HTMLElement | null;
-
-      // Fokus in den Dialog holen — sonst bleibt er auf dem Button dahinter,
-      // und Screenreader-Nutzer merken gar nicht, dass sich etwas geöffnet hat.
-      const focusTimer = window.setTimeout(() => {
-        const focusable = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-        (focusable ?? dialogRef.current)?.focus();
-      }, 0);
-
-      const handler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') { if (dismissible) onClose?.(); return; }
-        if (e.key !== 'Tab' || !dialogRef.current) return;
-        // Fokus-Falle: Tab darf den Dialog nicht verlassen, solange er offen ist.
-        const focusables = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-          .filter(el => !el.hasAttribute('disabled'));
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault(); last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault(); first.focus();
-        }
-      };
-      document.addEventListener('keydown', handler);
-      return () => {
-        document.removeEventListener('keydown', handler);
-        window.clearTimeout(focusTimer);
-        // Fokus zurück auf das Element, das den Dialog geöffnet hat.
-        previouslyFocused.current?.focus?.();
-      };
-    } else {
+    if (!open) {
       document.body.style.overflow = '';
+      return;
     }
-    return () => { document.body.style.overflow = ''; };
+    document.body.style.overflow = 'hidden';
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+
+    // Fokus in den Dialog holen — sonst bleibt er auf dem Button dahinter,
+    // und Screenreader-Nutzer merken gar nicht, dass sich etwas geöffnet hat.
+    const focusTimer = window.setTimeout(() => {
+      const focusable = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (focusable ?? dialogRef.current)?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = '';
+      // Fokus zurück auf das Element, das den Dialog geöffnet hat.
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open]);
+
+  // Separater Effekt fuer den Tastatur-Handler: darf sich bei jeder neuen
+  // onClose/dismissible-Referenz neu registrieren, ohne den Fokus
+  // anzufassen.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { if (dismissible) onClose?.(); return; }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      // Fokus-Falle: Tab darf den Dialog nicht verlassen, solange er offen ist.
+      const focusables = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+        .filter(el => !el.hasAttribute('disabled'));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, [open, onClose, dismissible]);
 
   if (!open) return null;
