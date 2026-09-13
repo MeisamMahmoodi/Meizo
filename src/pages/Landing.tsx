@@ -383,8 +383,12 @@ function BillingDemo() {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, visible).map(r => (
-              <tr key={r[0]} className="border-b border-[#F8FAFC]">
+            {/* Alle Zeilen bleiben im DOM und werden nur ein-/ausgeblendet
+                (statt gemountet/entmountet) — sonst ändert sich laufend die
+                Tabellenhöhe, was auf dem Handy (eine Spalte statt zwei) den
+                ganzen restlichen Seiteninhalt mit nach oben/unten zieht. */}
+            {rows.map((r, i) => (
+              <tr key={r[0]} className="border-b border-[#F8FAFC] transition-opacity duration-300" style={{ opacity: i < visible ? 1 : 0 }}>
                 <td className="py-1.5 font-medium text-[#0F172A]">{r[0]}</td>
                 <td className="text-[#64748B]">{r[1]}</td>
                 <td className="text-[#64748B]">{r[2]}</td>
@@ -437,8 +441,12 @@ function ControllingDemo() {
           </div>
         </div>
         <div className="space-y-2.5">
-          {properties.slice(0, visible || 1).map(p => (
-            <div key={p.name} className="text-xs">
+          {/* Alle Zeilen bleiben im DOM und werden nur ein-/ausgeblendet,
+              nicht gemountet/entmountet — gleicher Fix wie bei BillingDemo,
+              damit die Boxhöhe stabil bleibt und auf dem Handy nichts
+              darunter mit hoch- und runterrutscht. */}
+          {properties.map((p, i) => (
+            <div key={p.name} className="text-xs transition-opacity duration-300" style={{ opacity: i < Math.max(visible, 1) ? 1 : 0 }}>
               <div className="flex items-center justify-between mb-1">
                 <span className="font-semibold text-[#0F172A] truncate">{p.name}</span>
                 <span
