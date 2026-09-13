@@ -398,6 +398,70 @@ function BillingDemo() {
   );
 }
 
+function ControllingDemo() {
+  const properties = [
+    { name: 'Büropark Schwabing', marge: 34, pct: 78 },
+    { name: 'Praxis Bogenhausen', marge: 18, pct: 102 },
+    { name: 'Supermarkt Ost', marge: 41, pct: 60 },
+  ];
+  const totalUmsatz = 2750;
+  const avgMarge = Math.round(properties.reduce((s, p) => s + p.marge, 0) / properties.length);
+  const [visible, setVisible] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setVisible(v => (v + 1) % (properties.length + 1)), 750);
+    return () => clearInterval(t);
+  }, [properties.length]);
+
+  const margeColor = (m: number) => (m < 10 ? '#DC2626' : m < 25 ? '#F97316' : '#16A34A');
+  const ringCirc = 2 * Math.PI * 26;
+  const ringOffset = ringCirc * (1 - avgMarge / 100);
+
+  return (
+    <BrowserMockup url="meizo.de · Controlling">
+      <div className="p-4">
+        <div className="flex items-center gap-4 mb-4 pb-4 border-b border-[#F1F5F9]">
+          <div className="relative w-14 h-14 shrink-0">
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="26" fill="none" stroke="#F1F5F9" strokeWidth="5" />
+              <circle
+                cx="28" cy="28" r="26" fill="none" stroke={margeColor(avgMarge)} strokeWidth="5"
+                strokeDasharray={ringCirc} strokeDashoffset={ringOffset} strokeLinecap="round"
+                transform="rotate(-90 28 28)" style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#0F172A]">{avgMarge}%</div>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wide">Marge gesamt</p>
+            <p className="text-lg font-bold text-[#0F172A]">{totalUmsatz.toLocaleString('de-DE')} € Umsatz</p>
+          </div>
+        </div>
+        <div className="space-y-2.5">
+          {properties.slice(0, visible || 1).map(p => (
+            <div key={p.name} className="text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-[#0F172A] truncate">{p.name}</span>
+                <span
+                  className="font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                  style={{ color: margeColor(p.marge), backgroundColor: `${margeColor(p.marge)}1A` }}
+                >
+                  {p.marge}% Marge
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[#F1F5F9] overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, p.pct)}%`, backgroundColor: p.pct > 100 ? '#DC2626' : '#16A34A' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </BrowserMockup>
+  );
+}
+
 function LanguageDemo() {
   const langs = [
     { flag: '🇩🇪', name: 'Deutsch', greet: 'Guten Morgen' },
@@ -536,6 +600,14 @@ function ModulesSection() {
         bullets={['DATEV-Export nach einmaliger Einrichtung mit dem Steuerberater', 'Lohnabrechnung als PDF pro Mitarbeiter', 'Keine abgetippten Stundenzettel mehr']}
         visual={<BillingDemo />}
         reverse
+      />
+      <Module
+        eyebrow="Wirtschaftlichkeit"
+        eyebrowColor="#0D9488"
+        title="Welches Objekt sich wirklich lohnt, sehen Sie sofort"
+        text="Umsatz, Personalkosten und Marge pro Objekt werden automatisch aus echten Check-in-/Check-out-Zeiten berechnet — kein Excel, keine Schätzung. Verlustobjekte fallen sofort auf, bevor sie zum Problem werden."
+        bullets={['Marge pro Objekt in Echtzeit, ohne Excel', 'Soll-Ist-Stunden zeigen Über- und Unterbesetzung', 'Gute Grundlage für Preisgespräche mit dem Kunden']}
+        visual={<ControllingDemo />}
       />
       <Module
         eyebrow="Wiederkehrende Aufträge"
