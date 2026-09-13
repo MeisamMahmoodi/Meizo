@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getPendingActions, removePendingAction, type PendingAction } from '../lib/offlineQueue';
 
@@ -9,6 +9,12 @@ import { getPendingActions, removePendingAction, type PendingAction } from '../l
 export function useOfflineSync(onSynced?: () => void) {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  // Re-Entrancy-Schutz: Der Mount-Effekt und der 'online'-Event konnten sich
+  // bei instabiler Verbindung ueberlappen (z.B. 'online' feuert mehrfach kurz
+  // hintereinander) und denselben wartenden Eintrag doppelt verarbeiten — vor
+  // allem bei Checklisten-Eintraegen ohne eigenen Duplikat-Schutz. Ein Ref
+  // (statt State) wirkt sofort, ohne auf den naechsten Render zu warten.
+  const syncingRef = useRef(false);
 
   const refresh = useCallback(async () => {
     const actions = await getPendingActions();
@@ -62,6 +68,8 @@ export function useOfflineSync(onSynced?: () => void) {
   }, []);
 
   const syncAll = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
       const actions = await getPendingActions();
@@ -73,6 +81,7 @@ export function useOfflineSync(onSynced?: () => void) {
       await refresh();
       if (anySucceeded) onSynced?.();
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -93,5 +93,25 @@ export async function removePendingAction(id: string): Promise<void> {
 export function isLikelyNetworkError(err: unknown): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
-  return message.includes('fetch') || message.includes('network') || message.includes('failed to fetch');
+  return message.includes('fetch') || message.includes('network') || message.includes('failed to fetch') || message.includes('meizo_timeout');
+}
+
+// How long a check-in/check-out upload is allowed to hang before we treat it
+// as failed. Without this, a stalled request on bad mobile network (elevator,
+// basement, rural coverage) never resolves — the "Wird hochgeladen"-screen
+// would spin forever with no way for the employee to know what happened.
+export const UPLOAD_TIMEOUT_MS = 30000;
+
+// Races a promise against a timeout so a hung Supabase call surfaces as a
+// (network-classified) error instead of hanging indefinitely — the caller's
+// existing catch/isLikelyNetworkError path then queues it for retry like any
+// other connectivity failure.
+export function withTimeout<T>(promise: PromiseLike<T>, ms: number = UPLOAD_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('MEIZO_TIMEOUT: Keine Antwort vom Server')), ms);
+    Promise.resolve(promise).then(
+      value => { clearTimeout(timer); resolve(value); },
+      err => { clearTimeout(timer); reject(err); }
+    );
+  });
 }

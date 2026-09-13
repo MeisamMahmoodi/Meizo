@@ -7,11 +7,19 @@ interface OwnerLayoutProps {
   children: (props: { company: Company; refreshKey: number; onRefresh: () => void; onNavigate: (page: string) => void }) => React.ReactNode;
   activePage: string;
   onNavigate: (page: string) => void;
+  // Laedt company in App.tsx neu (einzige Quelle der Wahrheit). Vorher hat
+  // onRefresh nur refreshKey erhoeht, wodurch Unterseiten neu geladen wurden,
+  // aber das company-Objekt selbst (Firmenname, DATEV-Angaben etc.) auf dem
+  // Stand vom Login stehen blieb, bis die Seite komplett neu geladen wurde.
+  onCompanyRefresh: () => Promise<void>;
 }
 
-export function OwnerLayout({ company, children, activePage, onNavigate }: OwnerLayoutProps) {
+export function OwnerLayout({ company, children, activePage, onNavigate, onCompanyRefresh }: OwnerLayoutProps) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const onRefresh = () => setRefreshKey(k => k + 1);
+  const onRefresh = () => {
+    setRefreshKey(k => k + 1);
+    onCompanyRefresh();
+  };
 
   return (
     <div className="min-h-screen bg-surface-50">

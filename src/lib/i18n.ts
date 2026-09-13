@@ -88,6 +88,7 @@ export type TranslationKeys = {
   sickConfirmMessage: string;
   sickConfirmYes: string;
   sickConfirmNo: string;
+  cancelUploadButton: string;
   youAreSick: string;
   markAsHealthy: string;
   sickSince: string;
@@ -218,6 +219,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Du bist für einen Einsatz eingetragen. Wenn du dich krank meldest, muss dein Chef Ersatz finden.',
     sickConfirmYes: 'Ja, krank melden',
     sickConfirmNo: 'Abbrechen',
+    cancelUploadButton: 'Abbrechen',
     youAreSick: 'Du bist krankgemeldet',
     markAsHealthy: 'Ich bin wieder gesund',
     sickSince: 'Krank seit',
@@ -346,6 +348,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Esti asignat pentru o sarcina. Daca te declari bolnav, seful va trebui sa gaseasca un inlocuitor.',
     sickConfirmYes: 'Da, declar bolnav',
     sickConfirmNo: 'Anuleaza',
+    cancelUploadButton: 'Anuleaza',
     youAreSick: 'Esti in concediu medical',
     markAsHealthy: 'Sunt din nou sanatos',
     sickSince: 'Bolnav din',
@@ -474,6 +477,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'لديك مهمة مسجلة. إذا أبلغت عن مرضك، سيحتاج المدير لإيجاد بديل.',
     sickConfirmYes: 'نعم، إبلاغ عن مرض',
     sickConfirmNo: 'إلغاء',
+    cancelUploadButton: 'إلغاء',
     youAreSick: 'أنت مبلغ عن مرضك',
     markAsHealthy: 'أنا بصحة جيدة الآن',
     sickSince: 'مريض منذ',
@@ -602,6 +606,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Masz przypisane zadanie. Jesli zglosisz chorobe, szef bedzie musial znalezc zastepstwo.',
     sickConfirmYes: 'Tak, zglos chorobe',
     sickConfirmNo: 'Anuluj',
+    cancelUploadButton: 'Anuluj',
     youAreSick: 'Jestes na zwolnieniu chorobowym',
     markAsHealthy: 'Jestem znowu zdrow',
     sickSince: 'Chory od',
@@ -730,6 +735,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'You are assigned to a shift. If you report sick, your boss will need to find a replacement.',
     sickConfirmYes: 'Yes, report sick',
     sickConfirmNo: 'Cancel',
+    cancelUploadButton: 'Cancel',
     youAreSick: 'You are reported sick',
     markAsHealthy: 'I am healthy again',
     sickSince: 'Sick since',
@@ -858,6 +864,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Тебе призначено на зміну. Якщо повідомиш про хворобу, керівнику доведеться шукати заміну.',
     sickConfirmYes: 'Так, повідомити про хворобу',
     sickConfirmNo: 'Скасувати',
+    cancelUploadButton: 'Скасувати',
     youAreSick: 'Тебе позначено як хворого(у)',
     markAsHealthy: 'Я знову здоровий(а)',
     sickSince: 'Хворію з',
@@ -986,6 +993,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Bir vardiyaya atandın. Hastalık bildirirsen patronun yerine birini bulması gerekecek.',
     sickConfirmYes: 'Evet, hastalık bildir',
     sickConfirmNo: 'İptal',
+    cancelUploadButton: 'İptal',
     youAreSick: 'Hasta olarak bildirildin',
     markAsHealthy: 'Tekrar sağlıklıyım',
     sickSince: 'Hastalık başlangıcı',
@@ -1114,6 +1122,7 @@ const translations: Record<Lang, TranslationKeys> = {
     sickConfirmMessage: 'Назначен(а) си за смяна. Ако съобщиш болест, шефът ще трябва да намери заместник.',
     sickConfirmYes: 'Да, съобщи болест',
     sickConfirmNo: 'Отказ',
+    cancelUploadButton: 'Отказ',
     youAreSick: 'Отбелязан(а) си като болен(на)',
     markAsHealthy: 'Отново съм здрав(а)',
     sickSince: 'Болен(на) от',

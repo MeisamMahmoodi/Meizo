@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Camera, MapPin, Check, X, RotateCcw, Loader2, AlertTriangle, Navigation, CloudOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { addPendingAction, isLikelyNetworkError } from '../../lib/offlineQueue';
+import { addPendingAction, isLikelyNetworkError, withTimeout } from '../../lib/offlineQueue';
 import { t, type Lang } from '../../lib/i18n';
 import { useCameraCapture } from '../../hooks/useCameraCapture';
 import { CameraCaptureView } from '../shared/CameraCaptureView';
@@ -150,22 +150,29 @@ export function CheckInFlow({
     setUploadError('');
     try {
       const blob = await (await fetch(photoDataUrl)).blob();
-      const filename = `checkin/${assignmentId}_${Date.now()}.jpg`;
-      const { error: storageErr } = await supabase.storage
-        .from('assignment-photos')
-        .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
-      if (storageErr) throw new Error(storageErr.message);
+      // Timeout um Upload + DB-Update: ohne das konnte ein haengender Request
+      // bei schlechtem Netz (Keller, Aufzug, Funkloch) den "Wird hochgeladen"-
+      // Screen unbegrenzt anzeigen, ohne dass die Offline-Warteschlange
+      // ausgeloest wurde. Nach Ablauf zaehlt der Fehler als Netzwerkfehler und
+      // wird wie gewohnt weiter unten in die Warteschlange gelegt.
+      await withTimeout((async () => {
+        const filename = `checkin/${assignmentId}_${Date.now()}.jpg`;
+        const { error: storageErr } = await supabase.storage
+          .from('assignment-photos')
+          .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
+        if (storageErr) throw new Error(storageErr.message);
 
-      const { data: urlData } = supabase.storage.from('assignment-photos').getPublicUrl(filename);
+        const { data: urlData } = supabase.storage.from('assignment-photos').getPublicUrl(filename);
 
-      const { error: dbErr } = await supabase.from('assignments').update({
-        status: 'checked_in',
-        checked_in_at: new Date().toISOString(),
-        checkin_photo_url: urlData.publicUrl,
-        checkin_lat: employeeCoords?.lat ?? null,
-        checkin_lng: employeeCoords?.lng ?? null,
-      }).eq('id', assignmentId);
-      if (dbErr) throw new Error(dbErr.message);
+        const { error: dbErr } = await supabase.from('assignments').update({
+          status: 'checked_in',
+          checked_in_at: new Date().toISOString(),
+          checkin_photo_url: urlData.publicUrl,
+          checkin_lat: employeeCoords?.lat ?? null,
+          checkin_lng: employeeCoords?.lng ?? null,
+        }).eq('id', assignmentId);
+        if (dbErr) throw new Error(dbErr.message);
+      })());
 
       setStep('done');
       setTimeout(onSuccess, 1200);
@@ -356,6 +363,12 @@ export function CheckInFlow({
             <Loader2 size={40} className="text-[#22C55E] animate-spin mb-5" />
             <p className="text-sm font-semibold text-[#0F172A]">{t(lang, 'checkIn')}...</p>
             <p className="text-lg font-extrabold text-[#DC2626] text-center mt-5">{t(lang, 'dontCloseAppUploading')}</p>
+            {/* Ohne diesen Ausweg war der Mitarbeiter bei einem haengenden
+                Request im Vollbild gefangen und musste die App gewaltsam
+                schliessen, wodurch der Versuch spurlos verloren ging. */}
+            <button onClick={handleCancel} className="mt-6 text-xs font-semibold text-[#94A3B8] hover:text-[#64748B] transition-colors">
+              {t(lang, 'cancelUploadButton')}
+            </button>
           </div>
         )}
 

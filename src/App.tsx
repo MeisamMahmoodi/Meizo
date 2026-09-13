@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LangProvider, useLang } from './hooks/useLang';
@@ -42,11 +42,11 @@ function PageLoader() {
   );
 }
 
-function OwnerApp({ company }: { company: Company & { paid_until: string | null } }) {
+function OwnerApp({ company, onCompanyRefresh }: { company: Company & { paid_until: string | null }; onCompanyRefresh: () => Promise<void> }) {
   const [page, setPage] = useState('dashboard');
 
   return (
-    <OwnerLayout company={company} activePage={page} onNavigate={setPage}>
+    <OwnerLayout company={company} activePage={page} onNavigate={setPage} onCompanyRefresh={onCompanyRefresh}>
       {(props) => (
         <Suspense fallback={<PageLoader />}>
           {(() => {
@@ -257,6 +257,22 @@ function AppRoutes() {
   const [suspended, setSuspended] = useState(false);
   const prevUserId = React.useRef<string | null>(null);
 
+  // Laedt die Firmendaten neu und aktualisiert die eine "Quelle der Wahrheit"
+  // (ownerCompany), statt wie vorher nur einen lokalen Zaehler in OwnerLayout
+  // zu erhoehen. Vorher blieben Aenderungen aus Einstellungen (Firmenname,
+  // DATEV-Angaben usw.) app-weit auf dem Stand vom Login, bis man neu laedt —
+  // z.B. schlug der DATEV-Export direkt nach dem Eintragen der Beraternummer
+  // weiterhin fehl, weil er noch das alte company-Objekt sah.
+  const refreshOwnerCompany = useCallback(async () => {
+    if (!user) return;
+    const { data: company } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+    setOwnerCompany(company ? { ...company, paid_until: (company as unknown as { paid_until: string | null }).paid_until ?? null } : null);
+  }, [user]);
+
   useEffect(() => {
     const uid = user?.id ?? null;
     if (uid === prevUserId.current) return;
@@ -413,7 +429,7 @@ function AppRoutes() {
     return (
       <>
         <Routes>
-          <Route path="/*" element={<OwnerApp company={ownerCompany} />} />
+          <Route path="/*" element={<OwnerApp company={ownerCompany} onCompanyRefresh={refreshOwnerCompany} />} />
         </Routes>
         {showPaywall && <PaywallModal companyId={ownerCompany.id} />}
       </>

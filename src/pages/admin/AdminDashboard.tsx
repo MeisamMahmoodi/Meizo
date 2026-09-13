@@ -3,9 +3,10 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { calculateMonthlyPrice } from '../../lib/plans';
 import { toLocalDateStr } from '../../lib/utils';
+import { Modal as SharedModal } from '../../components/shared/Modal';
 import {
   Building2, Users, ShieldCheck, LogOut, ChevronDown, ChevronUp,
-  Plus, X, Eye, EyeOff, AlertTriangle, Calendar, CreditCard,
+  Plus, Eye, EyeOff, AlertTriangle, Calendar, CreditCard,
   CheckCircle, Clock, Trash2, RefreshCw, Key, Search, Database,
   UserCog, Mail, Copy, Check as CheckIcon, Crown, Activity,
 } from 'lucide-react';
@@ -373,10 +374,7 @@ function DeleteUserModal({ user, isSelf, onClose, onDone, token }: { user: AuthU
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmText, setConfirmText] = useState('');
-  // Beim eigenen Konto gibt es vorher gar keine besondere Warnung - man
-  // konnte sich versehentlich selbst aus dem Admin-Bereich löschen, ohne
-  // dass die Konsequenz (sofortiger Logout, kein Zugriff mehr) klar war.
-  const requiredPhrase = isSelf ? 'MEIN KONTO LÖSCHEN' : 'LÖSCHEN';
+  const requiredPhrase = 'LÖSCHEN';
 
   const submit = async () => {
     setError('');
@@ -396,24 +394,37 @@ function DeleteUserModal({ user, isSelf, onClose, onDone, token }: { user: AuthU
         <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center mx-auto">
           <Trash2 size={22} className="text-red-600" />
         </div>
-        {isSelf && (
-          <p className="text-sm font-bold text-red-700 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            Achtung: Das ist dein eigenes Konto. Du wirst sofort ausgeloggt und verlierst den Zugriff auf den Admin-Bereich.
-          </p>
+        {isSelf ? (
+          <>
+            {/* Der Server (admin-actions/delete-user) lehnt die Löschung des
+                eigenen Kontos immer ab — vorher fragte die UI trotzdem nach
+                einer Tipp-Bestätigung, die dann garantiert ins Leere lief.
+                Ehrlicher: den Grund sofort zeigen, statt eine Aktion
+                anzubieten, die nie gelingen kann. */}
+            <p className="text-sm font-bold text-red-700 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              Das ist dein eigenes Konto. Aus Sicherheitsgründen kann ein Admin sein eigenes Konto hier nicht selbst löschen — bitte einen anderen Admin darum bitten.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Verstanden</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-slate-500 text-center">
+              <strong>{user.email}</strong> wird unwiderruflich aus der Authentifizierung entfernt. Zugehörige Firmen- oder Mitarbeiter-Datensätze bleiben erhalten (ohne Login).
+            </p>
+            <Field label={`Tippe "${requiredPhrase}" zum Bestätigen`}>
+              <input value={confirmText} onChange={e => setConfirmText(e.target.value)} className="input-field text-sm" />
+            </Field>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Abbrechen</button>
+              <button onClick={submit} disabled={loading || confirmText !== requiredPhrase} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+                {loading ? '…' : 'Endgültig löschen'}
+              </button>
+            </div>
+          </>
         )}
-        <p className="text-sm text-slate-500 text-center">
-          <strong>{user.email}</strong> wird unwiderruflich aus der Authentifizierung entfernt. Zugehörige Firmen- oder Mitarbeiter-Datensätze bleiben erhalten (ohne Login).
-        </p>
-        <Field label={`Tippe "${requiredPhrase}" zum Bestätigen`}>
-          <input value={confirmText} onChange={e => setConfirmText(e.target.value)} className="input-field text-sm" />
-        </Field>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Abbrechen</button>
-          <button onClick={submit} disabled={loading || confirmText !== requiredPhrase} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
-            {loading ? '…' : 'Endgültig löschen'}
-          </button>
-        </div>
       </div>
     </Modal>
   );
@@ -462,17 +473,18 @@ function CreateUserModal({ onClose, onCreated, token }: { onClose: () => void; o
 }
 
 // ── Building blocks ──────────────────────────────────────────────────────────
+// Duennwandiger Wrapper um die geteilte Modal-Komponente (Fokus-Fang, Escape,
+// Klick-auf-Hintergrund-zum-Schliessen, Scroll-Sperre). Die lokale Kopie
+// vorher hatte nichts davon, obwohl genau hier (Firma/Konto endgueltig
+// loeschen, Passwort setzen) die riskantesten Aktionen der App liegen.
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-bold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
-        </div>
-        {children}
+    <SharedModal open onClose={onClose} width="max-w-md" ariaLabel={title}>
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h2 className="font-bold text-slate-900">{title}</h2>
       </div>
-    </div>
+      {children}
+    </SharedModal>
   );
 }
 
