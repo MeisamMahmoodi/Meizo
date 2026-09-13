@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "npm:stripe@14";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,12 +21,32 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
-      apiVersion: "2024-04-10",
-    });
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
 
-    const { company_id, employee_count } = await req.json();
-    const employeeCount = Math.max(1, Number(employee_count) || 1);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+    );
+
+    // Vorher: company_id kam ungeprueft aus dem Request Body, jeder
+    // eingeloggte oder gar nicht eingeloggte Aufrufer konnte eine Checkout
+    // Session fuer eine fremde Firma auslösen. Gleiche Absicherung wie in
+    // sync-subscription-seats/index.ts: nur der eingeloggte Owner der
+    // eigenen Firma darf fuer sie eine Session erzeugen.
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Nicht autorisiert" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { company_id } = await req.json();
 
     if (!company_id) {
       return new Response(JSON.stringify({ error: "Ungültige Parameter" }), {
@@ -33,6 +54,36 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from("companies")
+      .select("id, owner_id")
+      .eq("id", company_id)
+      .maybeSingle();
+
+    if (companyError || !company || company.owner_id !== user.id) {
+      return new Response(JSON.stringify({ error: "Nicht autorisiert für diese Firma" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // employee_count nicht mehr vom Client übernehmen (liess sich beliebig
+    // klein angeben, um die Abo-Grundlage künstlich niedrig zu halten),
+    // sondern die tatsächliche Mitarbeiterzahl serverseitig zaehlen, genau
+    // wie in sync-subscription-seats/index.ts.
+    const { count, error: countError } = await supabaseAdmin
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", company_id);
+
+    if (countError) throw countError;
+
+    const employeeCount = Math.max(1, count ?? 1);
+
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
+      apiVersion: "2024-04-10",
+    });
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
