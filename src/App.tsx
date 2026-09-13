@@ -31,6 +31,7 @@ const Pricing = lazy(() => import('./pages/Pricing').then(m => ({ default: m.Pri
 const Landing = lazy(() => import('./pages/Landing').then(m => ({ default: m.Landing })));
 const CustomerPortal = lazy(() => import('./pages/CustomerPortal').then(m => ({ default: m.CustomerPortal })));
 const Register = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
+const EmployeeInvite = lazy(() => import('./pages/EmployeeInvite').then(m => ({ default: m.EmployeeInvite })));
 
 // Shown in a Suspense fallback while a lazy chunk downloads (only on first
 // visit to that section — cached afterwards).
@@ -381,6 +382,17 @@ function AppRoutes() {
     );
   }
 
+  // Oeffentlicher Einladungslink fuer neue Mitarbeiter-Konten — muss
+  // genau wie /kunde/ fuer jeden erreichbar sein, unabhaengig von einer
+  // evtl. schon bestehenden fremden Session im selben Browser.
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/einladung/')) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <EmployeeInvite />
+      </Suspense>
+    );
+  }
+
   if (suspended) {
     return <AccountSuspendedScreen />;
   }
@@ -581,7 +593,8 @@ function UnifiedLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'login' | 'forgot' | 'sent'>('login');
+  const [mode, setMode] = useState<'login' | 'forgot' | 'sent' | 'invite'>('login');
+  const [inviteCode, setInviteCode] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetError, setResetError] = useState('');
   const { signIn, signInWithGoogle, requestPasswordReset } = useAuth();
@@ -688,10 +701,53 @@ function UnifiedLogin() {
             >
               {t('forgotPassword')}
             </button>
+            <button
+              type="button"
+              onClick={() => setMode('invite')}
+              className="w-full text-center text-xs font-medium text-ink-500 hover:text-ink-900 transition-colors"
+            >
+              Einladungscode eingeben
+            </button>
             <div className="flex justify-center pt-1">
               <IosInstallButton />
             </div>
           </form>
+        )}
+
+        {/* Fallback fuer Mitarbeiter, die ihren Einladungslink nicht direkt
+            anklicken konnten (z.B. muendlich diktiert statt per WhatsApp
+            geteilt) — leitet einfach auf dieselbe /einladung/CODE Seite
+            weiter, die auch beim direkten Klick auf den Link erscheint. */}
+        {mode === 'invite' && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-500 text-center -mt-2 mb-2">
+              Gib den Einladungscode ein, den du von deinem Chef bekommen hast.
+            </p>
+            <input
+              type="text"
+              placeholder="z.B. K7M2XQAB"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase())}
+              className="input-field text-center tracking-widest font-semibold"
+              autoFocus
+              autoCapitalize="characters"
+            />
+            <button
+              type="button"
+              disabled={!inviteCode.trim()}
+              onClick={() => { window.location.href = `/einladung/${inviteCode.trim()}`; }}
+              className="w-full py-3 rounded-xl text-sm font-semibold bg-ink-900 text-white hover:bg-ink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Bestätigen
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="w-full text-center text-xs font-medium text-ink-500 hover:text-ink-900 transition-colors pt-1"
+            >
+              {t('backToLogin')}
+            </button>
+          </div>
         )}
 
         {mode === 'forgot' && (

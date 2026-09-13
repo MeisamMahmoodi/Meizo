@@ -32,7 +32,8 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [editModal, setEditModal] = useState<Employee | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [creatingAccount, setCreatingAccount] = useState(false);
-  const [loginEnabled, setLoginEnabled] = useState(false);
+  const [invite, setInvite] = useState<{ employee: Employee; code: string } | null>(null);
+  const [creatingInviteFor, setCreatingInviteFor] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Employee | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<{ assignments: number; futureAssignments: number } | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
@@ -76,8 +77,6 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [newFirst, setNewFirst] = useState('');
   const [newLast, setNewLast] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [newWage, setNewWage] = useState('');
   const [newPropertyIds, setNewPropertyIds] = useState<string[]>([]);
   const [newPersonalnummer, setNewPersonalnummer] = useState('');
@@ -146,7 +145,6 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
 
     const { data, error } = await supabase.from('employees').insert({
       company_id: company.id, first_name: newFirst, last_name: newLast, phone: newPhone,
-      email: loginEnabled ? (newEmail || null) : null,
       status: 'active',
       hourly_wage: newWage ? parseFloat(newWage) : null,
       datev_personalnummer: newPersonalnummer || null,
@@ -158,24 +156,44 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       await supabase.from('employee_properties').insert(newPropertyIds.map(pid => ({ employee_id: data.id, property_id: pid })));
     }
 
-    if (data && loginEnabled && newEmail && newPassword) {
-      try {
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-employee-user`;
-        const session = (await supabase.auth.getSession()).data.session;
-        const res = await fetch(apiUrl, { method: 'POST', headers: { 'Authorization': `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newEmail, password: newPassword, employeeId: data.id }) });
-        const result = await res.json();
-        if (result.error) { addToast(`Account-Fehler: ${result.error}`, 'error'); } else { addToast('Mitarbeiter mit Login erstellt'); }
-      } catch { addToast('Account konnte nicht erstellt werden', 'error'); }
-    } else {
-      addToast('Mitarbeiter hinzugefügt');
-    }
+    addToast('Mitarbeiter hinzugefügt');
 
     setAddModal(false);
-    setNewFirst(''); setNewLast(''); setNewPhone(''); setNewEmail(''); setNewPassword(''); setNewWage('');
-    setNewPropertyIds([]); setLoginEnabled(false); setNewPersonalnummer('');
+    setNewFirst(''); setNewLast(''); setNewPhone(''); setNewWage('');
+    setNewPropertyIds([]); setNewPersonalnummer('');
     setCreatingAccount(false);
     onRefresh();
     syncSeats();
+  };
+
+  // Ersetzt das fruehere Verfahren, bei dem der Chef E-Mail und ein
+  // Start-Passwort fuer den Mitarbeiter selbst eintippen musste
+  // (create-employee-user). Stattdessen erzeugt der Chef hier nur noch
+  // einen kurzen, 14 Tage gueltigen Einladungscode; der Mitarbeiter legt
+  // sein Konto (eigene E-Mail, eigenes Passwort) danach selbst unter
+  // /einladung/CODE an.
+  const handleCreateInvite = async (emp: Employee) => {
+    setCreatingInviteFor(emp.id);
+    setMenuOpen(null);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-employee-invite`;
+      const session = (await supabase.auth.getSession()).data.session;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: emp.id }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        addToast(result.error || 'Einladungslink konnte nicht erstellt werden', 'error');
+        return;
+      }
+      setInvite({ employee: emp, code: result.code });
+    } catch {
+      addToast('Einladungslink konnte nicht erstellt werden', 'error');
+    } finally {
+      setCreatingInviteFor(null);
+    }
   };
 
   const openEditModal = (emp: Employee) => {
@@ -319,6 +337,11 @@ const handleDelete = async (emp: Employee) => {
 
   const getEmployeeMenuItems = (emp: Employee): ActionMenuItem[] => [
     { label: 'Bearbeiten', icon: Pencil, onClick: () => openEditModal(emp) },
+    ...(!emp.user_id ? [{
+      label: creatingInviteFor === emp.id ? 'Wird erstellt...' : 'Einladungslink erstellen',
+      icon: Shield,
+      onClick: () => handleCreateInvite(emp),
+    }] : []),
     emp.status === 'active'
       ? { label: 'Als krank melden', tone: 'danger', onClick: () => handleMarkSick(emp) }
       : { label: 'Krankmeldung beenden', tone: 'success', onClick: () => handleMarkActive(emp) },
@@ -482,7 +505,7 @@ const handleDelete = async (emp: Employee) => {
       )}
 
       {/* Add Employee Modal */}
-      <Modal open={addModal} onClose={() => { setAddModal(false); setLoginEnabled(false); }} width="max-w-md">
+      <Modal open={addModal} onClose={() => setAddModal(false)} width="max-w-md">
         <div className="p-8">
           <h2 className="text-lg font-bold text-[#0F172A] mb-6">Mitarbeiter hinzufügen</h2>
           <div className="space-y-4">
@@ -517,33 +540,57 @@ const handleDelete = async (emp: Employee) => {
               Ein weiterer Mitarbeiter erhöht deine monatliche Rechnung um {PER_EMPLOYEE_EUR}€.
             </div>
             <div className="h-px bg-[#F1F5F9] my-1" />
-            <div>
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={loginEnabled} onChange={e => setLoginEnabled(e.target.checked)} className="w-4 h-4 rounded accent-[#22C55E]" />
-                <span className="text-sm font-medium text-[#0F172A]">Login-Daten (optional)</span>
-              </label>
-              <p className="text-xs text-[#94A3B8] mt-1 ml-6.5">Mitarbeiter kann sich in der App anmelden und muss beim ersten Login ein Passwort setzen.</p>
-              {loginEnabled && (
-                <div className="space-y-4 mt-4 ml-6.5">
-                  <div>
-                    <label className="block text-sm font-medium text-[#0F172A] mb-1.5">E-Mail</label>
-                    <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="max@beispiel.de" className="input-field" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Initiales Passwort</label>
-                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mind. 6 Zeichen" className="input-field" />
-                  </div>
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-[#94A3B8]">
+              App-Zugang richtest du danach über "Einladungslink erstellen" in der Mitarbeiterliste ein.
+              Der Mitarbeiter legt sein Konto dann selbst mit eigener E-Mail und eigenem Passwort an.
+            </p>
           </div>
           <div className="flex justify-end gap-3 mt-8">
-            <button onClick={() => { setAddModal(false); setLoginEnabled(false); }} className="btn-ghost">Abbrechen</button>
+            <button onClick={() => setAddModal(false)} className="btn-ghost">Abbrechen</button>
             <button onClick={handleAddEmployee} disabled={!newFirst || !newLast || !newPhone || creatingAccount} className="btn-primary">
               {creatingAccount ? 'Wird erstellt...' : 'Speichern'}
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Einladungslink-Ergebnis: Code zum Kopieren/Teilen, nachdem der Chef
+          "Einladungslink erstellen" fuer einen Mitarbeiter geklickt hat. */}
+      <Modal open={!!invite} onClose={() => setInvite(null)} width="max-w-sm" ariaLabel="Einladungslink">
+        {invite && (() => {
+          const link = `${window.location.origin}/einladung/${invite.code}`;
+          const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
+            `Hallo ${invite.employee.first_name}, hier ist dein Zugang zu ${company.name}: ${link}`
+          )}`;
+          return (
+            <div className="p-8">
+              <h2 className="text-lg font-bold text-[#0F172A] mb-1.5">Einladungslink erstellt</h2>
+              <p className="text-sm text-[#64748B] mb-5">
+                Für {invite.employee.first_name} {invite.employee.last_name}. Gültig 14 Tage, nur einmal nutzbar.
+              </p>
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-mono text-[#0F172A] break-all mb-4">
+                {link}
+              </div>
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => { navigator.clipboard.writeText(link); addToast('Link kopiert'); }}
+                  className="btn-primary w-full"
+                >
+                  Link kopieren
+                </button>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-xl text-sm font-semibold text-center bg-[#25D366] text-white hover:opacity-90 transition-opacity"
+                >
+                  Per WhatsApp teilen
+                </a>
+                <button onClick={() => setInvite(null)} className="btn-ghost w-full">Schließen</button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Edit Employee Modal */}
