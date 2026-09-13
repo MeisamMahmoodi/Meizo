@@ -233,7 +233,10 @@ function DispatchDemo() {
         <p className="text-sm font-bold text-[#0F172A]">📍 Objekt Müller</p>
         <p className="text-xs text-[#64748B] mt-0.5">07:30 – 09:30 Uhr</p>
       </div>
-      <div className={`rounded-xl p-3.5 border transition-colors duration-300 ${phase === 'success' ? 'bg-[#F0FDF4] border-[#BBF7D0]' : 'bg-white border-[#FED7AA]'}`}>
+      {/* min-h + flex/justify-center: der "übernimmt"-Zustand hat nur eine
+          Textzeile, der Warte-Zustand zwei. Ohne feste Mindesthöhe schrumpft
+          die Box beim Wechsel und alles darunter rutscht mit hoch/runter. */}
+      <div className={`rounded-xl p-3.5 border transition-colors duration-300 min-h-[70px] flex flex-col justify-center ${phase === 'success' ? 'bg-[#F0FDF4] border-[#BBF7D0]' : 'bg-white border-[#FED7AA]'}`}>
         {phase !== 'success' ? (
           <>
             <p className="text-sm flex items-center gap-1.5"><MessageCircle size={13} className="text-[#16A34A]" /> <span className="font-bold text-[#0F172A]">{candidate}</span> <span className="text-[#6B7280]">wird per App-Push gefragt</span></p>
