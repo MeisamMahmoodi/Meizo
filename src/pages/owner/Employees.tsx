@@ -21,6 +21,10 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [employeeProperties, setEmployeeProperties] = useState<EmployeeProperty[]>([]);
+  // Ohne das blitzte beim ersten Laden kurz "Keine Mitarbeiter gefunden" auf,
+  // bevor die echten Daten da waren — wie bei Dashboard/Controlling schon
+  // behoben.
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'sick'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'wage' | 'newest'>('name');
@@ -108,6 +112,8 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       setEmployeeProperties(epRes.data || []);
     } catch {
       // Component renders with existing state
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -210,9 +216,24 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const handleMarkSick = async (emp: Employee) => {
     const { error: e1 } = await supabase.from('employees').update({ status: 'sick' }).eq('id', emp.id);
     if (e1) { addToast('Fehler', 'error'); return; }
-    const { data: existing } = await supabase.from('sick_reports').select('id').eq('employee_id', emp.id).eq('date', todayStr).maybeSingle();
+    const { data: existing, error: eCheck } = await supabase.from('sick_reports').select('id').eq('employee_id', emp.id).eq('date', todayStr).maybeSingle();
+    // Vorher wurde der Fehler dieses Inserts nicht geprueft: schlug er fehl,
+    // stand der Mitarbeiter in der Liste als "krank", aber im Dashboard
+    // (das nur sick_reports liest) tauchte nichts auf. Bei einem Fehler den
+    // Status wieder zuruecksetzen, statt die beiden Tabellen auseinanderlaufen
+    // zu lassen.
+    if (eCheck) {
+      await supabase.from('employees').update({ status: 'active' }).eq('id', emp.id);
+      addToast('Fehler beim Krankmelden', 'error');
+      return;
+    }
     if (!existing) {
-      await supabase.from('sick_reports').insert({ employee_id: emp.id, date: todayStr, reason: '' });
+      const { error: e2 } = await supabase.from('sick_reports').insert({ employee_id: emp.id, date: todayStr, reason: '' });
+      if (e2) {
+        await supabase.from('employees').update({ status: 'active' }).eq('id', emp.id);
+        addToast('Fehler beim Krankmelden', 'error');
+        return;
+      }
     }
     setMenuOpen(null); onRefresh(); addToast(`${emp.first_name} ${emp.last_name} als krank markiert`);
   };
@@ -221,10 +242,19 @@ const handleMarkActive = async (emp: Employee) => {
   const { error } = await supabase.from('employees').update({ status: 'active' }).eq('id', emp.id);
   if (error) { addToast('Fehler', 'error'); return; }
   const todayStr = toLocalDateStr(new Date());
-  await supabase.from('sick_reports').delete()
+  const { error: e2 } = await supabase.from('sick_reports').delete()
     .eq('employee_id', emp.id)
     .lte('date', todayStr)
     .or(`date_to.gte.${todayStr},date_to.is.null`);
+  // Der Mitarbeiter ist jetzt wieder aktiv (das Wichtigste ist erledigt),
+  // aber wenn das Aufraeumen der Krankmeldung fehlschlaegt, soll das nicht
+  // stillschweigend passieren — sonst taucht im Dashboard weiterhin eine
+  // "erledigte" Krankmeldung auf.
+  if (e2) {
+    setMenuOpen(null); onRefresh();
+    addToast(`${emp.first_name} ${emp.last_name} ist aktiv, aber die Krankmeldung konnte nicht entfernt werden`, 'error');
+    return;
+  }
   setMenuOpen(null); onRefresh(); addToast(`${emp.first_name} ${emp.last_name} als gesund markiert`);
 };
 
@@ -418,30 +448,38 @@ const handleDelete = async (emp: Employee) => {
         />
       </div>
 
-      <div className="lg:hidden space-y-3">
-        {filteredEmployees.map(renderEmployeeCard)}
-        {filteredEmployees.length === 0 && <div className="card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Mitarbeiter gefunden</p></div>}
-      </div>
+      {loading ? (
+        <div className="card p-10 text-center">
+          <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : (
+        <>
+          <div className="lg:hidden space-y-3">
+            {filteredEmployees.map(renderEmployeeCard)}
+            {filteredEmployees.length === 0 && <div className="card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Mitarbeiter gefunden</p></div>}
+          </div>
 
-      <div className="hidden lg:block card">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#F1F5F9]">
-              <th className="text-left px-5 py-3.5 section-label">Mitarbeiter</th>
-              <th className="text-left px-5 py-3.5 section-label">Kontakt</th>
-              <th className="text-left px-5 py-3.5 section-label">Stundenlohn</th>
-              <th className="text-left px-5 py-3.5 section-label">Status</th>
-              <th className="text-left px-5 py-3.5 section-label">Login</th>
-              <th className="text-left px-5 py-3.5 section-label">Objekte</th>
-              <th className="px-5 py-3.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredEmployees.map(renderEmployeeRow)}
-            {filteredEmployees.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-[#94A3B8]">Keine Mitarbeiter gefunden</td></tr>}
-          </tbody>
-        </table>
-      </div>
+          <div className="hidden lg:block card">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#F1F5F9]">
+                  <th className="text-left px-5 py-3.5 section-label">Mitarbeiter</th>
+                  <th className="text-left px-5 py-3.5 section-label">Kontakt</th>
+                  <th className="text-left px-5 py-3.5 section-label">Stundenlohn</th>
+                  <th className="text-left px-5 py-3.5 section-label">Status</th>
+                  <th className="text-left px-5 py-3.5 section-label">Login</th>
+                  <th className="text-left px-5 py-3.5 section-label">Objekte</th>
+                  <th className="px-5 py-3.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map(renderEmployeeRow)}
+                {filteredEmployees.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-[#94A3B8]">Keine Mitarbeiter gefunden</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Add Employee Modal */}
       <Modal open={addModal} onClose={() => { setAddModal(false); setLoginEnabled(false); }} width="max-w-md">

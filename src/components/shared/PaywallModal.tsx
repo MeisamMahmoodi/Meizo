@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Check, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BASE_FEE_EUR, PER_EMPLOYEE_EUR, calculateMonthlyPrice } from '../../lib/plans';
+import { Modal } from './Modal';
 
 interface Props {
   companyId: string;
@@ -48,9 +49,12 @@ export function PaywallModal({ companyId }: Props) {
   const price = employeeCount != null ? calculateMonthlyPrice(employeeCount) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm" />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-slate-100 px-6 py-8 max-w-sm w-full mx-4">
+    // Bewusst nicht schliessbar (dismissible=false): die Testphase ist
+    // abgelaufen, der Owner muss zahlen oder sich abmelden. Vorher hatte
+    // dieser Dialog ausserdem keinen Fokus-Fang/role=dialog wie der Rest der
+    // App — Tab konnte auf die verdeckte Seite dahinter springen.
+    <Modal open dismissible={false} width="max-w-sm" ariaLabel="Deine Testphase ist abgelaufen">
+      <div className="px-6 py-8">
         <div className="text-center mb-6">
           <img src="/meizoLogoMarkDark.png" alt="meizo" className="h-8 w-auto mx-auto mb-5" />
           <h2 className="text-xl font-bold text-slate-900">Deine Testphase ist abgelaufen.</h2>
@@ -101,6 +105,6 @@ export function PaywallModal({ companyId }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

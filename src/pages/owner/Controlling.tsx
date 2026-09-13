@@ -37,6 +37,18 @@ export function Controlling({ company, refreshKey }: ControllingProps) {
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedMonth]);
 
+  // Vorher keine Realtime-Updates — Marge/Soll-Ist pro Objekt blieben nach
+  // Aenderungen an Einsaetzen oder Objekten unveraendert, bis man den Monat
+  // wechselte oder neu lud.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`controlling-${company.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'properties', filter: `company_id=eq.${company.id}` }, () => loadData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [company.id, selectedMonth]);
+
   async function loadData() {
     const requestId = ++requestIdRef.current;
     setLoading(true);

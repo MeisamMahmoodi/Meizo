@@ -33,9 +33,24 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
   const [editingWageId, setEditingWageId] = useState<string | null>(null);
   const [editingWageValue, setEditingWageValue] = useState('');
   const [search, setSearch] = useState('');
+  // Ohne das blitzte beim ersten Laden bzw. Monatswechsel kurz "Keine
+  // Mitarbeiter gefunden" auf, bevor die echten Daten da waren.
+  const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedMonth]);
+
+  // Vorher keine Realtime-Updates — ein Check-in/-out oder eine geänderte
+  // Zuweisung auf einem anderen Gerät blieb in der Abrechnung unsichtbar,
+  // bis man den Monat wechselte oder neu lud.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`payroll-${company.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees', filter: `company_id=eq.${company.id}` }, () => loadData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [company.id, selectedMonth]);
 
   async function loadData() {
     try {
@@ -60,6 +75,8 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
       setMonthAssignments((assignRes.data as unknown as AssignmentWithDetails[]) || []);
     } catch {
       // Component renders with existing state
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -615,6 +632,13 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
       </div>
 
       {/* Employee Payroll List */}
+      {loading ? (
+        // Ohne das blitzte beim ersten Laden bzw. Monatswechsel kurz "Keine
+        // Mitarbeiter gefunden" auf, bevor die echten Daten da waren.
+        <div className="card p-10 text-center">
+          <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : (
       <div className="space-y-3">
         {filteredResults.map(({ employee, worked, expected, diff, wage, monthlyEarnings, assignments }) => {
           const workedH = worked / 60;
@@ -791,6 +815,7 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
           </div>
         )}
       </div>
+      )}
 
       {/* Total Footer */}
       {payrollData.results.length > 0 && (

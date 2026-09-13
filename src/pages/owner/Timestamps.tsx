@@ -19,11 +19,24 @@ interface AssignmentWithDetails extends Assignment {
 
 export function Timestamps({ company, refreshKey }: TimestampsProps) {
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([]);
+  // Ohne das blitzte beim ersten Laden bzw. Tageswechsel kurz "Keine
+  // Einsaetze fuer diesen Tag" auf, bevor die echten Daten da waren.
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => toLocalDateStr(new Date()));
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; label: string } | null>(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedDate]);
+
+  // Vorher keine Realtime-Updates — ein Check-in/-out im Feld tauchte hier
+  // nicht auf, bis man den Tag wechselte oder neu lud.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`timestamps-${company.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [company.id, selectedDate]);
 
   async function loadData() {
     try {
@@ -35,6 +48,8 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
       setAssignments((data as unknown as AssignmentWithDetails[]) || []);
     } catch {
       // Component renders with existing state
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -275,7 +290,11 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
         </div>
       </div>
 
-      {assignments.length === 0 ? (
+      {loading ? (
+        <div className="card p-12 text-center">
+          <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : assignments.length === 0 ? (
         <div className="card p-12 text-center">
           <CalendarDays size={40} className="text-[#CBD5E1] mx-auto mb-4" />
           <p className="text-sm text-[#94A3B8]">Keine Einsaetze fuer diesen Tag</p>

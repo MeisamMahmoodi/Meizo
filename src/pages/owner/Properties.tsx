@@ -28,6 +28,9 @@ const typeOptions = [
 
 export function Properties({ company, refreshKey, onRefresh, onNavigate }: PropertiesProps) {
   const [properties, setProperties] = useState<Property[]>([]);
+  // Ohne das blitzte beim ersten Laden kurz "Keine Objekte gefunden" auf,
+  // bevor die echten Daten da waren.
+  const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<Property | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -69,12 +72,25 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
 
   useEffect(() => { loadData(); }, [company.id, refreshKey]);
 
+  // Vorher hatten nur Dashboard/Mitarbeiter/Einsätze Realtime — Änderungen an
+  // Objekten (z.B. auf einem zweiten Gerät angelegt) blieben hier unsichtbar
+  // bis zum manuellen Neuladen.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`properties-${company.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'properties', filter: `company_id=eq.${company.id}` }, () => loadData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [company.id]);
+
   async function loadData() {
     try {
       const { data } = await supabase.from('properties').select('*').eq('company_id', company.id).order('name');
       setProperties(data || []);
     } catch {
       // Component renders with existing state
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -237,34 +253,40 @@ export function Properties({ company, refreshKey, onRefresh, onNavigate }: Prope
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {filteredProperties.map(prop => {
-          return (
-            <div key={prop.id} className="card p-5 relative">
-              <div className="flex items-start gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-[#F8FAFC] flex items-center justify-center shrink-0">
-                  <TypeIcon type={prop.type} />
+      {loading ? (
+        <div className="card p-10 text-center">
+          <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {filteredProperties.map(prop => {
+            return (
+              <div key={prop.id} className="card p-5 relative">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-[#F8FAFC] flex items-center justify-center shrink-0">
+                    <TypeIcon type={prop.type} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0F172A]">{prop.name}</p>
+                    <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1.5"><MapPin size={12} className="text-[#94A3B8]" /> {prop.address}</p>
+                    {prop.monthly_price != null && (
+                      <p className="text-xs text-[#16A34A] font-semibold mt-1 flex items-center gap-1.5"><Euro size={12} /> {prop.monthly_price.toLocaleString('de-DE')} €/Monat</p>
+                    )}
+                  </div>
+                  <ActionMenu
+                    items={getPropertyMenuItems(prop)}
+                    isOpen={menuOpen === prop.id}
+                    onOpenChange={open => setMenuOpen(open ? prop.id : null)}
+                  />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#0F172A]">{prop.name}</p>
-                  <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1.5"><MapPin size={12} className="text-[#94A3B8]" /> {prop.address}</p>
-                  {prop.monthly_price != null && (
-                    <p className="text-xs text-[#16A34A] font-semibold mt-1 flex items-center gap-1.5"><Euro size={12} /> {prop.monthly_price.toLocaleString('de-DE')} €/Monat</p>
-                  )}
-                </div>
-                <ActionMenu
-                  items={getPropertyMenuItems(prop)}
-                  isOpen={menuOpen === prop.id}
-                  onOpenChange={open => setMenuOpen(open ? prop.id : null)}
-                />
               </div>
-            </div>
-          );
-        })}
-        {filteredProperties.length === 0 && (
-          <div className="col-span-2 card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Objekte gefunden</p></div>
-        )}
-      </div>
+            );
+          })}
+          {filteredProperties.length === 0 && (
+            <div className="col-span-2 card p-10 text-center"><p className="text-sm text-[#94A3B8]">Keine Objekte gefunden</p></div>
+          )}
+        </div>
+      )}
 
       {/* Add Property Modal */}
       <Modal open={addModal} onClose={() => { setAddModal(false); resetForm(); }} width="max-w-md">

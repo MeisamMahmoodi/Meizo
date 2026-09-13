@@ -37,14 +37,17 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
   const [replacementRequests, setReplacementRequests] = useState<{ id: string; sick_report_id: string; property_id: string; status: string; replacement_employee_id: string; replacement_employee?: Employee }[]>([]);
   const [addModal, setAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
-  const [loading, setLoading] = useState(false);
+  // War vorher useState(false) — beim allerersten Laden blitzte dadurch kurz
+  // "Keine Einsätze für diesen Tag" auf, bevor die echten Daten da waren,
+  // anders als bei Dashboard/Controlling, die mit true starten.
+  const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
   // Wochenansicht
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [weekAssignments, setWeekAssignments] = useState<AssignmentWithDetails[]>([]);
   const [weekSickReports, setWeekSickReports] = useState<{ employee_id: string; date: string; date_to: string | null }[]>([]);
-  const [weekLoading, setWeekLoading] = useState(false);
+  const [weekLoading, setWeekLoading] = useState(true);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
   const [newPropertyId, setNewPropertyId] = useState('');
@@ -71,13 +74,25 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
   useEffect(() => { loadData(); }, [company.id, refreshKey, selectedDate]);
 
   useEffect(() => {
+    // Reagierte vorher nur auf die Tagesansicht (loadData) — in der
+    // Wochenansicht blieb das Raster bei einer Aenderung (z.B. Check-in eines
+    // Mitarbeiters, Einsatz von anderswo geaendert) unveraendert, bis man die
+    // Woche wechselte oder in die Tagesansicht und zurueck sprang. viewMode
+    // steht in den deps, damit der Handler beim Umschalten nicht die alte
+    // Ansicht "einfriert".
     const channel = supabase
       .channel(`assignments-${company.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sick_reports' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => {
+        loadData();
+        if (viewMode === 'week') loadWeekData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sick_reports' }, () => {
+        loadData();
+        if (viewMode === 'week') loadWeekData();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [company.id, selectedDate]);
+  }, [company.id, selectedDate, viewMode]);
 
   async function loadData() {
     setLoading(true);
@@ -187,21 +202,36 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
 
     const resolvedFrom = timeFrom ?? prop?.time_from ?? null;
     const resolvedTo = timeTo ?? prop?.time_to ?? null;
-    const duplicate = newEmployeeIds.some(eid =>
-      companyAssignments.some(a =>
-        a.property_id === newPropertyId &&
-        a.employee_id === eid &&
-        a.date === newDate &&
-        (a.time_from ?? a.property?.time_from ?? null) === resolvedFrom &&
-        (a.time_to ?? a.property?.time_to ?? null) === resolvedTo
-      )
+
+    setSaving(true);
+
+    // Vorher wurde nur gegen die bereits geladenen Einsaetze des aktuell
+    // angezeigten Tages (selectedDate) geprueft. Waehlte man im Formular ein
+    // abweichendes Datum (newDate != selectedDate), griff die Pruefung nie,
+    // weil fuer dieses Datum gar keine Einsaetze geladen waren — es konnten
+    // echte Doppel-Einsaetze inkl. doppelter Push-Benachrichtigung entstehen.
+    // Jetzt wird gezielt fuer newDate nachgefragt, direkt vor dem Speichern.
+    const { data: existingForDate, error: dupCheckErr } = await supabase
+      .from('assignments')
+      .select('employee_id, time_from, time_to')
+      .eq('property_id', newPropertyId)
+      .eq('date', newDate)
+      .in('employee_id', newEmployeeIds);
+    if (dupCheckErr) {
+      addToast('Fehler beim Prüfen auf Doppel-Einsätze', 'error');
+      setSaving(false);
+      return;
+    }
+    const duplicate = (existingForDate || []).some(a =>
+      (a.time_from ?? prop?.time_from ?? null) === resolvedFrom &&
+      (a.time_to ?? prop?.time_to ?? null) === resolvedTo
     );
     if (duplicate) {
       addToast('Für diesen Mitarbeiter existiert bereits ein Einsatz zu dieser Zeit', 'error');
+      setSaving(false);
       return;
     }
 
-    setSaving(true);
     const inserts = newEmployeeIds.map(eid => ({
       property_id: newPropertyId,
       employee_id: eid,
@@ -486,7 +516,9 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
 
       {viewMode === 'week' ? (
         weekLoading ? (
-          <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" /></div>
+          // Gleicher Spinner-Stil wie Dashboard/Controlling (grau, in Card) —
+          // vorher grün, größer, ohne Card-Hintergrund.
+          <div className="card p-10 text-center"><div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" /></div>
         ) : (
           <WeekGrid
             weekDates={currentWeek.dates}
@@ -499,7 +531,7 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
           />
         )
       ) : loading ? (
-        <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" /></div>
+        <div className="card p-10 text-center"><div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" /></div>
       ) : groupedAssignments.length === 0 ? (
         <div className="card p-10 text-center">
           <Calendar size={36} className="text-[#CBD5E1] mx-auto mb-3" />
