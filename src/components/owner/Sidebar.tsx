@@ -29,6 +29,10 @@ const navItems: NavItem[] = [
   { id: 'settings',    label: 'Einstellungen',icon: Settings },
 ];
 
+// Helle Sidebar (monochrom: Weiß/Grau, Farbe nur als echtes Signal) statt
+// der frueheren dunklen Navy-Leiste - zusammen mit dem grauen Canvas in
+// OwnerLayout die eigentliche Design-Umstellung, nicht nur Kosmetik an
+// einzelnen Farbwerten.
 export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
   const { signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,14 +53,14 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
       {/* Brand */}
       <div className="px-6 pt-8 pb-6">
         <div className="flex items-center justify-between">
-          <img src="/meizoLogoMark.png" alt="meizo" className="h-8 w-auto" />
-          <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all">
+          <img src="/meizoLogoMarkDark.png" alt="meizo" className="h-8 w-auto" />
+          <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1.5 rounded-lg text-ink-300 hover:text-ink-900 hover:bg-surface-100 transition-all">
             <X size={18} />
           </button>
         </div>
       </div>
 
-      <div className="mx-5 h-px bg-white/[0.06]" />
+      <div className="mx-5 h-px bg-ink-100" />
 
       {/* Navigation */}
       <nav className="flex-1 mt-4 px-3">
@@ -68,35 +72,35 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
               onClick={() => handleNav(item)}
               className={`w-full flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-2xl text-[13px] font-medium transition-all duration-200 mb-1 ${
                 isActive
-                  ? 'bg-white/[0.09] text-white'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.045]'
+                  ? 'bg-surface-100 text-ink-900'
+                  : 'text-ink-500 hover:text-ink-900 hover:bg-surface-50'
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-colors duration-200 ${
-                  isActive ? 'bg-white/[0.12]' : ''
+                  isActive ? 'bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)]' : ''
                 }`}
               >
                 <item.icon
                   size={17}
                   strokeWidth={isActive ? 2 : 1.5}
-                  className={isActive ? 'text-white' : ''}
+                  className={isActive ? 'text-ink-900' : ''}
                 />
               </div>
-              <span>{item.label}</span>
+              <span className={isActive ? 'font-semibold' : ''}>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="mx-5 h-px bg-white/[0.06]" />
+      <div className="mx-5 h-px bg-ink-100" />
 
       {/* Legal links */}
       <div className="px-4 pt-3 pb-1 flex gap-1">
         <button
           onClick={() => { onNavigate('impressum'); setMobileOpen(false); }}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
-            active === 'impressum' ? 'text-slate-200 bg-white/[0.06]' : 'text-slate-500 hover:text-slate-400 hover:bg-white/[0.04]'
+            active === 'impressum' ? 'text-ink-900 bg-surface-100' : 'text-ink-300 hover:text-ink-500 hover:bg-surface-50'
           }`}
         >
           <FileText size={11} />
@@ -105,7 +109,7 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
         <button
           onClick={() => { onNavigate('datenschutz'); setMobileOpen(false); }}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
-            active === 'datenschutz' ? 'text-slate-200 bg-white/[0.06]' : 'text-slate-500 hover:text-slate-400 hover:bg-white/[0.04]'
+            active === 'datenschutz' ? 'text-ink-900 bg-surface-100' : 'text-ink-300 hover:text-ink-500 hover:bg-surface-50'
           }`}
         >
           <Shield size={11} />
@@ -113,17 +117,17 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
         </button>
       </div>
 
-      <div className="mx-5 h-px bg-white/[0.06]" />
+      <div className="mx-5 h-px bg-ink-100" />
 
       {/* User */}
       <div className="px-4 pt-6 pb-5">
         <div className="flex items-center gap-3 px-2 py-2">
           <Avatar firstName={ownerName?.split(' ')[0] || 'O'} lastName={ownerName?.split(' ')[1] || ''} id="owner" size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate leading-tight">{ownerName || 'Inhaber'}</p>
-            <p className="text-slate-500 text-[11px] font-medium mt-0.5">Inhaber</p>
+            <p className="text-ink-900 text-sm font-medium truncate leading-tight">{ownerName || 'Inhaber'}</p>
+            <p className="text-ink-300 text-[11px] font-medium mt-0.5">Inhaber</p>
           </div>
-          <button onClick={() => setLogoutConfirm(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.06] transition-all" title="Abmelden">
+          <button onClick={() => setLogoutConfirm(true)} className="p-1.5 rounded-lg text-ink-300 hover:text-ink-700 hover:bg-surface-100 transition-all" title="Abmelden">
             <LogOut size={15} />
           </button>
         </div>
@@ -134,23 +138,23 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-ink-900/95 backdrop-blur-sm flex items-center px-4 z-40 border-b border-white/[0.06]" style={{ paddingTop: 'max(0.875rem, env(safe-area-inset-top))', paddingBottom: '0.875rem' }}>
-        <button onClick={() => setMobileOpen(true)} className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors mr-3">
+      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm flex items-center px-4 z-40 border-b border-ink-100" style={{ paddingTop: 'max(0.875rem, env(safe-area-inset-top))', paddingBottom: '0.875rem' }}>
+        <button onClick={() => setMobileOpen(true)} className="text-ink-500 hover:text-ink-900 p-1.5 rounded-lg transition-colors mr-3">
           <Menu size={22} />
         </button>
-        <img src="/meizoLogoMark.png" alt="meizo" className="h-6 w-auto" />
+        <img src="/meizoLogoMarkDark.png" alt="meizo" className="h-6 w-auto" />
       </div>
 
       {/* Mobile Drawer */}
       <div className={`lg:hidden fixed inset-0 z-50 transition-all duration-300 ${mobileOpen ? 'visible' : 'invisible'}`}>
-        <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${mobileOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMobileOpen(false)} />
-        <aside className={`absolute left-0 top-0 bottom-0 w-72 bg-ink-900 flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${mobileOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMobileOpen(false)} />
+        <aside className={`absolute left-0 top-0 bottom-0 w-72 bg-white flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {sidebarContent}
         </aside>
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 bg-ink-900 flex-col z-40">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-ink-100 flex-col z-40">
         {sidebarContent}
       </aside>
 

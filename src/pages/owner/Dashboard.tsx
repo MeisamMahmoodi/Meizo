@@ -294,7 +294,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
   })();
 
   return (
-    <div className="bg-[#F1F5F9] rounded-[2rem] p-4 sm:p-6">
+    <div>
       {trialBadge && (
         <div className="mb-5 inline-flex items-center px-3.5 py-1.5 rounded-xl bg-orange-100 text-orange-700 text-xs font-semibold">
           {trialBadge}

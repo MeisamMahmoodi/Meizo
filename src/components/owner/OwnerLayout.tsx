@@ -22,7 +22,7 @@ export function OwnerLayout({ company, children, activePage, onNavigate, onCompa
   };
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen bg-[#F0F1F3]">
       <Sidebar active={activePage} onNavigate={onNavigate} ownerName={company.owner_name} />
       <main className="lg:ml-60 lg:pt-0 p-4 sm:p-6 lg:p-8" style={{ paddingTop: 'calc(3.5rem + max(0, env(safe-area-inset-top)))' }}>
         {children({ company, refreshKey, onRefresh, onNavigate })}
