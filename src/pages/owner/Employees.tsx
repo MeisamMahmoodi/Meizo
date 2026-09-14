@@ -9,7 +9,7 @@ import { ActionMenu } from '../../components/shared/ActionMenu';
 import type { ActionMenuItem } from '../../components/shared/ActionMenu';
 import { calculateMonthlyPrice, PER_EMPLOYEE_EUR } from '../../lib/plans';
 import { toLocalDateStr } from '../../lib/utils';
-import type { Employee, Property, EmployeeProperty, Company } from '../../lib/types';
+import type { Employee, Property, EmployeeProperty, EmployeeInvite, Company } from '../../lib/types';
 
 interface EmployeesProps {
   company: Company;
@@ -21,6 +21,7 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [employeeProperties, setEmployeeProperties] = useState<EmployeeProperty[]>([]);
+  const [invites, setInvites] = useState<EmployeeInvite[]>([]);
   // Ohne das blitzte beim ersten Laden kurz "Keine Mitarbeiter gefunden" auf,
   // bevor die echten Daten da waren — wie bei Dashboard/Controlling schon
   // behoben.
@@ -95,20 +96,23 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       .channel(`employees-${company.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees', filter: `company_id=eq.${company.id}` }, () => loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sick_reports' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_invites', filter: `company_id=eq.${company.id}` }, () => loadData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [company.id]);
 
   async function loadData() {
     try {
-      const [empRes, propRes, epRes] = await Promise.all([
+      const [empRes, propRes, epRes, inviteRes] = await Promise.all([
         supabase.from('employees').select('*').eq('company_id', company.id).order('last_name'),
         supabase.from('properties').select('*').eq('company_id', company.id),
         supabase.from('employee_properties').select('*'),
+        supabase.from('employee_invites').select('*').eq('company_id', company.id),
       ]);
       setEmployees(empRes.data || []);
       setProperties(propRes.data || []);
       setEmployeeProperties(epRes.data || []);
+      setInvites(inviteRes.data || []);
     } catch {
       // Component renders with existing state
     } finally {
@@ -118,6 +122,12 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
 
   const getKnownProperties = (empId: string) =>
     employeeProperties.filter(ep => ep.employee_id === empId).map(ep => properties.find(p => p.id === ep.property_id)).filter(Boolean) as Property[];
+
+  // Noch nicht abgelaufener, noch nicht eingeloester Einladungslink fuer
+  // diesen Mitarbeiter, falls vorhanden — entscheidet ob das Menue
+  // "einsehen" oder "erstellen" anbietet.
+  const getActiveInvite = (empId: string) =>
+    invites.find(inv => inv.employee_id === empId && !inv.used_at && new Date(inv.expires_at) > new Date());
 
   const todayStr = toLocalDateStr(new Date());
 
@@ -156,14 +166,18 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       await supabase.from('employee_properties').insert(newPropertyIds.map(pid => ({ employee_id: data.id, property_id: pid })));
     }
 
-    addToast('Mitarbeiter hinzugefügt');
-
     setAddModal(false);
     setNewFirst(''); setNewLast(''); setNewPhone(''); setNewWage('');
     setNewPropertyIds([]); setNewPersonalnummer('');
     setCreatingAccount(false);
     onRefresh();
     syncSeats();
+
+    addToast('Mitarbeiter hinzugefügt');
+
+    // Gleich den Einladungslink miterzeugen und anzeigen, statt den Chef
+    // dafuer extra nochmal in die Liste klicken zu lassen.
+    if (data) await handleCreateInvite(data as Employee);
   };
 
   // Ersetzt das fruehere Verfahren, bei dem der Chef E-Mail und ein
@@ -193,6 +207,20 @@ export function Employees({ company, refreshKey, onRefresh }: EmployeesProps) {
       addToast('Einladungslink konnte nicht erstellt werden', 'error');
     } finally {
       setCreatingInviteFor(null);
+    }
+  };
+
+  // Menue-Aktion aus der Mitarbeiterliste: gibt es schon einen gueltigen,
+  // noch nicht eingeloesten Link, den einfach nochmal anzeigen statt ihn
+  // durch einen neuen zu ersetzen. Erst wenn keiner (mehr) gueltig ist, wird
+  // ein neuer erstellt.
+  const openInviteModal = (emp: Employee) => {
+    const active = getActiveInvite(emp.id);
+    if (active) {
+      setInvite({ employee: emp, code: active.code });
+      setMenuOpen(null);
+    } else {
+      handleCreateInvite(emp);
     }
   };
 
@@ -338,9 +366,11 @@ const handleDelete = async (emp: Employee) => {
   const getEmployeeMenuItems = (emp: Employee): ActionMenuItem[] => [
     { label: 'Bearbeiten', icon: Pencil, onClick: () => openEditModal(emp) },
     ...(!emp.user_id ? [{
-      label: creatingInviteFor === emp.id ? 'Wird erstellt...' : 'Einladungslink erstellen',
+      label: creatingInviteFor === emp.id
+        ? 'Wird erstellt...'
+        : (getActiveInvite(emp.id) ? 'Einladungslink einsehen' : 'Einladungslink erstellen'),
       icon: Shield,
-      onClick: () => handleCreateInvite(emp),
+      onClick: () => openInviteModal(emp),
     }] : []),
     emp.status === 'active'
       ? { label: 'Als krank melden', tone: 'danger', onClick: () => handleMarkSick(emp) }
@@ -541,8 +571,8 @@ const handleDelete = async (emp: Employee) => {
             </div>
             <div className="h-px bg-[#F1F5F9] my-1" />
             <p className="text-xs text-[#94A3B8]">
-              App-Zugang richtest du danach über "Einladungslink erstellen" in der Mitarbeiterliste ein.
-              Der Mitarbeiter legt sein Konto dann selbst mit eigener E-Mail und eigenem Passwort an.
+              Nach dem Speichern bekommst du direkt einen Einladungslink zum Teilen.
+              Der Mitarbeiter legt sein Konto damit selbst mit eigener E-Mail und eigenem Passwort an.
             </p>
           </div>
           <div className="flex justify-end gap-3 mt-8">
@@ -564,9 +594,9 @@ const handleDelete = async (emp: Employee) => {
           )}`;
           return (
             <div className="p-8">
-              <h2 className="text-lg font-bold text-[#0F172A] mb-1.5">Einladungslink erstellt</h2>
+              <h2 className="text-lg font-bold text-[#0F172A] mb-1.5">Einladungslink</h2>
               <p className="text-sm text-[#64748B] mb-5">
-                Für {invite.employee.first_name} {invite.employee.last_name}. Gültig 14 Tage, nur einmal nutzbar.
+                Für {invite.employee.first_name} {invite.employee.last_name}. Gültig 14 Tage ab Erstellung, nur einmal nutzbar.
               </p>
               <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-mono text-[#0F172A] break-all mb-4">
                 {link}

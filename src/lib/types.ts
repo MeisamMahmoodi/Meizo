@@ -78,6 +78,16 @@ export interface EmployeeProperty {
   property_id: string;
 }
 
+export interface EmployeeInvite {
+  id: string;
+  employee_id: string;
+  company_id: string;
+  code: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
 export interface Assignment {
   id: string;
   property_id: string;
