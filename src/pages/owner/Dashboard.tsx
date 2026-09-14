@@ -294,7 +294,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
   })();
 
   return (
-    <div>
+    <div className="bg-[#F1F5F9] rounded-[2rem] p-4 sm:p-6">
       {trialBadge && (
         <div className="mb-5 inline-flex items-center px-3.5 py-1.5 rounded-xl bg-orange-100 text-orange-700 text-xs font-semibold">
           {trialBadge}
@@ -489,8 +489,8 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#EFF6FF' }}>
-              <Users size={20} className="text-[#2563EB]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <Users size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Mitarbeiter</p>
           </div>
@@ -526,8 +526,8 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
         </div>
         <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-5 sm:p-6 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: sickCount > 0 ? '#FEF2F2' : '#F0FDF4' }}>
-              <HeartPulse size={20} className={sickCount > 0 ? 'text-[#EF4444]' : 'text-[#16A34A]'} />
+            <div className="stat-icon" style={{ backgroundColor: sickCount > 0 ? '#FEF2F2' : '#F1F5F9' }}>
+              <HeartPulse size={20} className={sickCount > 0 ? 'text-[#EF4444]' : 'text-[#0F172A]'} />
             </div>
             <p className="section-label">Krankmeldungen</p>
           </div>
