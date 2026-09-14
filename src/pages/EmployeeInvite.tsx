@@ -2,6 +2,8 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { VerifyCodeForm } from '../components/shared/VerifyCodeForm';
 
 type InviteReason = 'not_found' | 'used' | 'expired';
 
@@ -19,8 +21,19 @@ const REASON_TEXT: Record<InviteReason, string> = {
 // Oeffentliche Seite unter /einladung/CODE — bewusst ausserhalb der
 // normalen rollenbasierten Routen in App.tsx gerendert (gleiches Muster wie
 // /kunde/:token bei CustomerPortal), weil hier noch niemand eingeloggt ist.
+//
+// Ablauf seit der E-Mail-Verifizierung: die Seite erstellt das Konto nicht
+// mehr direkt server-seitig (vorher: accept-employee-invite legte das Konto
+// sofort mit email_confirm=true an, ganz ohne Nachweis, dass die
+// eingegebene Adresse ueberhaupt existiert/dem Nutzer gehoert). Stattdessen
+// laeuft es jetzt genau wie bei der Chef-Registrierung ueber Supabase Auth
+// selbst: signUp() -> 6-stelliger Code per Mail -> verifyOtp(). Erst danach,
+// wenn die Mail-Adresse nachweislich bestaetigt ist, verknuepft
+// finalize-employee-invite (App.tsx/NoProfileScreen ruft das automatisch
+// auf) den Mitarbeiter-Datensatz mit dem neuen Konto.
 export function EmployeeInvite() {
   const navigate = useNavigate();
+  const { verifySignupOtp, resendSignupOtp } = useAuth();
   const code = window.location.pathname.replace('/einladung/', '').trim().toUpperCase();
   const [invite, setInvite] = useState<InviteState>({ status: 'loading' });
   const [email, setEmail] = useState('');
@@ -28,6 +41,7 @@ export function EmployeeInvite() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [step, setStep] = useState<'form' | 'verify'>('form');
 
   useEffect(() => {
     if (!code) { setInvite({ status: 'invalid', reason: 'not_found' }); return; }
@@ -48,32 +62,34 @@ export function EmployeeInvite() {
       return;
     }
     setSubmitting(true);
-    try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/accept-employee-invite`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, email, password }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.message || 'Die Einladung konnte nicht eingelöst werden.');
-        setSubmitting(false);
-        return;
-      }
-      // Konto steht serverseitig schon, jetzt nur noch selbst einloggen —
-      // dafuer braucht es keinen zusaetzlichen Token-Umweg ueber die Edge
-      // Function, das Passwort ist hier ja schon im Browser bekannt.
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        setError('Konto wurde erstellt, die automatische Anmeldung ist aber fehlgeschlagen. Bitte melde dich manuell an.');
-        setSubmitting(false);
-        return;
-      }
-      navigate('/', { replace: true });
-    } catch {
-      setError('Etwas ist schiefgelaufen. Bitte versuche es erneut.');
+
+    // Einladung direkt vor dem Anlegen des Kontos nochmal frisch pruefen —
+    // sie kann zwischen dem Laden der Seite und dem Absenden inzwischen
+    // verbraucht oder abgelaufen sein.
+    const { data: freshInvite, error: rpcError } = await supabase
+      .rpc('get_employee_invite_info', { p_code: code });
+    if (rpcError || !freshInvite || !freshInvite.valid) {
+      setInvite({ status: 'invalid', reason: (freshInvite?.reason as InviteReason) ?? 'not_found' });
       setSubmitting(false);
+      return;
     }
+
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { pending_invite_code: code } },
+    });
+    setSubmitting(false);
+
+    if (signUpError) {
+      setError(
+        signUpError.message.includes('already registered')
+          ? 'Diese E-Mail ist bereits registriert. Bitte melde dich an oder nutze eine andere E-Mail-Adresse.'
+          : signUpError.message
+      );
+      return;
+    }
+    setStep('verify');
   };
 
   if (invite.status === 'loading') {
@@ -98,6 +114,27 @@ export function EmployeeInvite() {
           </a>
         </div>
       </div>
+    );
+  }
+
+  if (step === 'verify') {
+    return (
+      <VerifyCodeForm
+        email={email}
+        onVerify={async (otp) => {
+          const { error: err } = await verifySignupOtp(email, otp);
+          if (!err) {
+            // Session steht jetzt — App.tsx (NoProfileScreen) verknuepft
+            // den Mitarbeiter-Datensatz automatisch ueber
+            // finalize-employee-invite, sobald es die neue Session sieht.
+            navigate('/', { replace: true });
+          }
+          return { error: err };
+        }}
+        onResend={() => resendSignupOtp(email)}
+        onBack={() => setStep('form')}
+        submitLabel="Konto bestätigen"
+      />
     );
   }
 

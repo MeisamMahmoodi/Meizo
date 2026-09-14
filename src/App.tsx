@@ -481,11 +481,15 @@ function AppRoutes() {
 //    deleted) — falls back to the original error message.
 function NoProfileScreen({ user, signOut, timedOut }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; signOut: () => Promise<void>; timedOut?: boolean }) {
   const pendingCompanyName = (user.user_metadata?.pending_company_name as string | undefined)?.trim();
+  // Gesetzt von EmployeeInvite.tsx bei signUp() — nach der Code-Bestaetigung
+  // landet der Mitarbeiter hier mit Session, aber noch ohne Profil. Gleiches
+  // Muster wie pendingCompanyName oben, nur fuer den Einladungs-Weg.
+  const pendingInviteCode = (user.user_metadata?.pending_invite_code as string | undefined)?.trim();
   const isFreshGoogleLogin = !pendingCompanyName && user.app_metadata?.provider === 'google';
 
   const [companyName, setCompanyName] = useState(pendingCompanyName ?? '');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(!!pendingCompanyName);
+  const [loading, setLoading] = useState(!!pendingCompanyName || !!pendingInviteCode);
   const [failed, setFailed] = useState(false);
 
   const completeSignup = async (name: string) => {
@@ -510,12 +514,43 @@ function NoProfileScreen({ user, signOut, timedOut }: { user: NonNullable<Return
     }
   };
 
+  const completeInvite = async (inviteCode: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/finalize-employee-invite`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: inviteCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? json.error ?? 'Die Einladung konnte nicht abgeschlossen werden.');
+      window.location.reload();
+    } catch (err) {
+      setLoading(false);
+      setFailed(true);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   useEffect(() => {
     if (pendingCompanyName) completeSignup(pendingCompanyName);
+    else if (pendingInviteCode) completeInvite(pendingInviteCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (pendingCompanyName && !failed) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-ink-900 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (pendingInviteCode && !failed) {
     return (
       <div className="min-h-screen bg-surface-50 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-ink-900 border-t-transparent rounded-full animate-spin" />

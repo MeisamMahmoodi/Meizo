@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { VerifyCodeForm } from '../components/shared/VerifyCodeForm';
 
 export function Register() {
   const [companyName, setCompanyName] = useState('');
@@ -8,8 +9,12 @@ export function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  // 'form' -> Firmenname/E-Mail/Passwort, 'verify' -> 6-stelliger Code aus
+  // der Mail. Vorher gab es hier nur eine "Mail geschickt, klick den Link"-
+  // Meldung — der Link riss aus der installierten PWA raus in Safari/Mail,
+  // siehe heutige Diskussion zur Mitarbeiter-App. Der Code bleibt in der App.
+  const [step, setStep] = useState<'form' | 'verify'>('form');
+  const { signUp, verifySignupOtp, resendSignupOtp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,7 +33,7 @@ export function Register() {
     if (err) {
       setError(err.includes('already registered') ? 'Diese E-Mail ist bereits registriert' : err);
     } else {
-      setSent(true);
+      setStep('verify');
     }
   };
 
@@ -38,17 +43,21 @@ export function Register() {
     if (err) setError(err);
   };
 
-  if (sent) {
+  if (step === 'verify') {
     return (
-      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-6">
-        <div className="w-full max-w-sm text-center">
-          <img src="/meizoLogoMarkDark.png" alt="Meizo" className="h-11 w-auto mx-auto mb-5" />
-          <h1 className="text-xl font-bold text-ink-900 tracking-tight mb-2">Fast geschafft</h1>
-          <p className="text-ink-500 text-sm leading-relaxed">
-            Wir haben dir eine Bestätigungsmail an <span className="font-semibold text-ink-900">{email}</span> geschickt. Klick auf den Link darin, dann ist dein Konto startklar.
-          </p>
-        </div>
-      </div>
+      <VerifyCodeForm
+        email={email}
+        onVerify={async (code) => {
+          const { error: err } = await verifySignupOtp(email, code);
+          // Bei Erfolg uebernimmt App.tsx (Session vorhanden, noch kein
+          // Profil -> NoProfileScreen fuehrt die Firmen-Einrichtung fertig
+          // aus), deshalb hier keine explizite Navigation noetig.
+          return { error: err };
+        }}
+        onResend={() => resendSignupOtp(email)}
+        onBack={() => setStep('form')}
+        submitLabel="Konto bestätigen"
+      />
     );
   }
 

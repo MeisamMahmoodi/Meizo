@@ -10,6 +10,8 @@ interface AuthContextType {
   passwordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, companyName: string) => Promise<{ error: string | null }>;
+  verifySignupOtp: (email: string, token: string) => Promise<{ error: string | null }>;
+  resendSignupOtp: (email: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<{ error: string | null }>;
@@ -88,6 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  // Bestaetigt den 6-stelligen Code aus der Signup-Mail (Owner-Registrierung
+  // und Mitarbeiter-Einladung nutzen denselben Supabase-Mechanismus). Bei
+  // Erfolg ist der Nutzer danach eingeloggt, onAuthStateChange uebernimmt
+  // den Rest.
+  const verifySignupOtp = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+    return { error: error?.message ?? null };
+  };
+
+  const resendSignupOtp = async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    return { error: error?.message ?? null };
+  };
+
   // Self-service Google login/signup. First-time users land back here with
   // a session but no profile yet — AppRoutes picks that up and finishes
   // the signup (asking for a company name, since Google doesn't provide one).
@@ -136,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, mustChangePassword, passwordRecovery, signIn, signUp, signInWithGoogle, signOut, changePassword, requestPasswordReset }}>
+    <AuthContext.Provider value={{ user, session, loading, mustChangePassword, passwordRecovery, signIn, signUp, verifySignupOtp, resendSignupOtp, signInWithGoogle, signOut, changePassword, requestPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );
