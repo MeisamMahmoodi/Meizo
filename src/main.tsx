@@ -40,6 +40,25 @@ if ('serviceWorker' in navigator) {
           // Kein Netz o.ae. — beim naechsten Intervall erneut versuchen.
         });
       }, UPDATE_CHECK_INTERVAL_MS);
+
+      // Auf iOS wird die als Home-Bildschirm-App installierte PWA im
+      // Hintergrund komplett pausiert — kein Timer/Interval laeuft dann
+      // weiter. Ein "Wiedereroeffnen" ist dort technisch oft kein echter
+      // Seiten-Neuladen, sondern nur ein Fortsetzen des pausierten
+      // Zustands, wodurch der obige Intervall-Check faktisch nie zum
+      // Zug kommt und Mitarbeiter dauerhaft auf einer alten Version
+      // haengen blieben (nur ein komplettes Loeschen + Neuinstallieren
+      // der App erzwang einen echten Neuladen). visibilitychange feuert
+      // beim Zurueckkehren aus dem Hintergrund dagegen zuverlaessig,
+      // deshalb hier zusaetzlich direkt bei jedem Vordergrund-Wechsel
+      // nach einem Update fragen.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          registration.update().catch(() => {
+            // Kein Netz o.ae. — naechster Vordergrund-Wechsel versucht es erneut.
+          });
+        }
+      });
     });
   });
 }
