@@ -53,7 +53,19 @@ export function ActionMenu({ items, isOpen, onOpenChange, align = 'right', ariaL
   useEffect(() => {
     if (!isOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) onOpenChange(false);
+      if (!containerRef.current) return;
+      // Mitarbeiter/Objekte rendern parallel eine Mobile-Karten- und eine
+      // Desktop-Tabellen-Ansicht (per CSS ein/ausgeblendet), beide mit
+      // eigenem ActionMenu fuer denselben Datensatz. Ist "isOpen" fuer beide
+      // gleichzeitig true (gleicher geteilter State), wuerde das Mousedown
+      // auf einem Button der SICHTBAREN Instanz von der VERSTECKTEN Instanz
+      // als "Klick ausserhalb" gewertet und das Menu (beide, da geteilter
+      // State) schon vor dem eigentlichen Click-Event schliessen — die
+      // Menu-Eintraege waren dann nicht mehr klickbar. Eine ausgeblendete
+      // Instanz (display:none im Vorfahren) hat kein offsetParent mehr und
+      // darf deshalb gar nicht erst mitentscheiden.
+      if (containerRef.current.offsetParent === null) return;
+      if (!containerRef.current.contains(e.target as Node)) onOpenChange(false);
     }
     function handleEscape(e: KeyboardEvent) {
       if (e.key === 'Escape') onOpenChange(false);
