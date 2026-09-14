@@ -354,7 +354,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sickWithAssignments.map(({ sickReport: sr, assignments: empAssignments, hasReplacement }) => (
-              <div key={sr.employee_id} className="bg-[#FEF2F2] border border-[#FECACA]/60 rounded-2xl p-6">
+              <div key={sr.employee_id} className="bg-[#FEF2F2] border border-[#FECACA]/60 rounded-[1.5rem] p-6">
                 <div className="flex items-start gap-4">
                   <div className="shrink-0">
                     <Avatar firstName={sr.employee?.first_name || ''} lastName={sr.employee?.last_name || ''} id={sr.employee_id} size="lg" />
@@ -466,7 +466,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sickWithoutAssignments.map(({ sickReport: sr }) => (
-              <div key={sr.employee_id} className="bg-[#FFF7ED] border border-[#FFEDD5]/60 rounded-2xl p-5">
+              <div key={sr.employee_id} className="bg-[#FFF7ED] border border-[#FFEDD5]/60 rounded-[1.5rem] p-5">
                 <div className="flex items-start gap-4">
                   <div className="shrink-0">
                     <Avatar firstName={sr.employee?.first_name || ''} lastName={sr.employee?.last_name || ''} id={sr.employee_id} size="md" />
@@ -487,7 +487,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div className="card p-5 sm:p-6">
+        <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="stat-icon" style={{ backgroundColor: '#EFF6FF' }}>
               <Users size={20} className="text-[#2563EB]" />
@@ -506,25 +506,25 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           <p className="text-xs text-[#94A3B8] mt-2.5">verfügbar</p>
           {!loading && sickCount > 0 && <p className="text-xs text-[#F97316] font-semibold mt-1">{sickCount} krank</p>}
         </div>
-        <div className="card p-5 sm:p-6">
+        <div className="bg-[#0F172A] rounded-[1.5rem] shadow-[0_10px_32px_-8px_rgba(15,23,42,0.35)] p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#F0FDF4' }}>
-              <CalendarDays size={20} className="text-[#16A34A]" />
+            <div className="stat-icon" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+              <CalendarDays size={20} className="text-white" />
             </div>
-            <p className="section-label">Einsätze heute</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/60">Einsätze heute</p>
           </div>
           {loading ? (
-            <div className="h-8 w-10 bg-[#F1F5F9] rounded-lg animate-pulse" />
+            <div className="h-8 w-10 bg-white/10 rounded-lg animate-pulse" />
           ) : (
-            <p className="text-[1.75rem] leading-none font-bold text-[#0F172A] tracking-tight">{todayAssignments.length}</p>
+            <p className="text-[1.75rem] leading-none font-bold text-white tracking-tight">{todayAssignments.length}</p>
           )}
           {!loading && (todayAssignments.length > 0 ? (
-            <p className="text-xs text-[#16A34A] font-medium mt-2.5">{propertiesWithAssignments.length} Objekte</p>
+            <p className="text-xs text-[#4ADE80] font-medium mt-2.5">{propertiesWithAssignments.length} Objekte</p>
           ) : (
-            <p className="text-xs text-[#94A3B8] mt-2.5">Keine Einsätze</p>
+            <p className="text-xs text-white/50 mt-2.5">Keine Einsätze</p>
           ))}
         </div>
-        <div className="card p-5 sm:p-6 col-span-2 lg:col-span-1">
+        <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-5 sm:p-6 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="stat-icon" style={{ backgroundColor: sickCount > 0 ? '#FEF2F2' : '#F0FDF4' }}>
               <HeartPulse size={20} className={sickCount > 0 ? 'text-[#EF4444]' : 'text-[#16A34A]'} />
@@ -557,11 +557,11 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
           // Vorher wurde hier beim ersten Laden kurz "Keine Einsätze für
           // heute" angezeigt, bevor die echten Daten da waren - sah aus wie
           // ein leerer Tag, obwohl nur noch geladen wurde.
-          <div className="card p-10 text-center">
+          <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-10 text-center">
             <div className="w-6 h-6 border-2 border-[#CBD5E1] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : todayAssignments.length === 0 ? (
-          <div className="card p-10 text-center">
+          <div className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)] p-10 text-center">
             <CalendarDays size={36} className="text-[#CBD5E1] mx-auto mb-3" />
             <p className="text-sm text-[#94A3B8]">Keine Einsätze für heute</p>
           </div>
@@ -582,7 +582,7 @@ export function Dashboard({ company, refreshKey, onRefresh }: DashboardProps) {
               else if (hasSick) statusColor = 'bg-[#FB923C]';
 
               return (
-                <div key={`${group.property.id}_${group.timeFrom}_${group.timeTo}`} className="card">
+                <div key={`${group.property.id}_${group.timeFrom}_${group.timeTo}`} className="bg-white rounded-[1.5rem] shadow-[0_6px_24px_-10px_rgba(15,23,42,0.12)]">
                   <div className="p-5 sm:p-6 flex items-start gap-4">
                     <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${statusColor}`} />
                     <div className="flex-1 min-w-0">
