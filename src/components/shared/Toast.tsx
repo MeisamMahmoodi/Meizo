@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { CheckCircle, X, AlertCircle } from 'lucide-react';
 
 interface Toast {
@@ -24,14 +24,20 @@ let toastId = 0;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (message: string, type: 'success' | 'error' = 'success') => {
+  // useCallback: ohne stabile Referenz bekommt jeder Consumer, der addToast
+  // in einer useEffect-Abhaengigkeitsliste hat, bei JEDEM ToastProvider-
+  // Rerender (z.B. weil gerade ein Toast hinzugefuegt wurde) eine "neue"
+  // Funktion und feuert den Effekt erneut — das erzeugt bei einem einzelnen
+  // andauernden Fehlerzustand (z.B. fehlender VAPID-Key) eine Endlosschleife
+  // aus immer neuen Toasts, die den ganzen Bildschirm zuspammen.
+  const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = ++toastId;
     setToasts(prev => [...prev, { id, message, type }]);
-  };
+  }, []);
 
-  const removeToast = (id: number) => {
+  const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ addToast }}>
