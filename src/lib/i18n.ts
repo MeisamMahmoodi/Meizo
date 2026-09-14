@@ -165,6 +165,10 @@ export type TranslationKeys = {
   ariaMarkNotificationRead: string;
   ariaDismiss: string;
   disableNotifications: string;
+  tabHome: string;
+  tabHours: string;
+  tabSettings: string;
+  hoursComingSoon: string;
 };
 
 const translations: Record<Lang, TranslationKeys> = {
@@ -300,6 +304,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Als gelesen markieren',
     ariaDismiss: 'Ausblenden',
     disableNotifications: 'Benachrichtigungen deaktivieren',
+    tabHome: 'Start',
+    tabHours: 'Stunden',
+    tabSettings: 'Einstellungen',
+    hoursComingSoon: 'Deine gearbeiteten Stunden werden hier bald angezeigt.',
   },
   ro: {
     goodMorning: 'Buna dimineata',
@@ -433,6 +441,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Marcheaza ca citit',
     ariaDismiss: 'Ascunde',
     disableNotifications: 'Dezactivează notificările',
+    tabHome: 'Acasă',
+    tabHours: 'Ore',
+    tabSettings: 'Setări',
+    hoursComingSoon: 'Orele tale lucrate vor apărea aici în curând.',
   },
   ar: {
     goodMorning: 'صباح الخير',
@@ -566,6 +578,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'وضع علامة كمقروء',
     ariaDismiss: 'إخفاء',
     disableNotifications: 'إيقاف الإشعارات',
+    tabHome: 'الرئيسية',
+    tabHours: 'الساعات',
+    tabSettings: 'الإعدادات',
+    hoursComingSoon: 'ستظهر ساعات عملك هنا قريبًا.',
   },
   pl: {
     goodMorning: 'Dzien dobry',
@@ -699,6 +715,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Oznacz jako przeczytane',
     ariaDismiss: 'Ukryj',
     disableNotifications: 'Wyłącz powiadomienia',
+    tabHome: 'Start',
+    tabHours: 'Godziny',
+    tabSettings: 'Ustawienia',
+    hoursComingSoon: 'Twoje przepracowane godziny pojawią się tutaj wkrótce.',
   },
   en: {
     goodMorning: 'Good morning',
@@ -832,6 +852,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Mark as read',
     ariaDismiss: 'Dismiss',
     disableNotifications: 'Disable notifications',
+    tabHome: 'Home',
+    tabHours: 'Hours',
+    tabSettings: 'Settings',
+    hoursComingSoon: 'Your worked hours will appear here soon.',
   },
   uk: {
     goodMorning: 'Доброго ранку',
@@ -965,6 +989,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Позначити як прочитане',
     ariaDismiss: 'Приховати',
     disableNotifications: 'Вимкнути сповіщення',
+    tabHome: 'Головна',
+    tabHours: 'Години',
+    tabSettings: 'Налаштування',
+    hoursComingSoon: 'Ваші відпрацьовані години з\'являться тут незабаром.',
   },
   tr: {
     goodMorning: 'Günaydın',
@@ -1098,6 +1126,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Okundu olarak işaretle',
     ariaDismiss: 'Gizle',
     disableNotifications: 'Bildirimleri kapat',
+    tabHome: 'Ana Sayfa',
+    tabHours: 'Saatler',
+    tabSettings: 'Ayarlar',
+    hoursComingSoon: 'Çalıştığın saatler yakında burada görünecek.',
   },
   bg: {
     goodMorning: 'Добро утро',
@@ -1231,6 +1263,10 @@ const translations: Record<Lang, TranslationKeys> = {
     ariaMarkNotificationRead: 'Маркирай като прочетено',
     ariaDismiss: 'Скрий',
     disableNotifications: 'Изключи известията',
+    tabHome: 'Начало',
+    tabHours: 'Часове',
+    tabSettings: 'Настройки',
+    hoursComingSoon: 'Отработените ти часове ще се показват тук скоро.',
   },
 };
 

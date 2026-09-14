@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Clock, LogIn, Mail, LogOut, Heart, Bell, CheckCircle, CalendarDays, Globe, AlertTriangle, LogOut as CheckOutIcon, BellRing, BellOff, AlarmClock, CloudOff } from 'lucide-react';
+import { MapPin, Clock, LogIn, Mail, Heart, Bell, CheckCircle, CalendarDays, Globe, AlertTriangle, LogOut as CheckOutIcon, BellRing, BellOff, AlarmClock, CloudOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLang } from '../../hooks/useLang';
@@ -24,7 +24,7 @@ interface AssignmentWithProperty extends Assignment {
 }
 
 export function EmployeeHome({ onSickLeave }: EmployeeHomeProps) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { lang, setLang, t, rtl } = useLang();
   const { addToast } = useToast();
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -349,7 +349,7 @@ const { data: upcoming } = await supabase
   })();
 
   return (
-    <div className={`min-h-screen bg-surface-50 px-5 sm:px-6 pt-12 pb-8 sm:py-8 max-w-md mx-auto ${rtl ? 'text-right' : 'text-left'}`} dir={rtl ? 'rtl' : 'ltr'}>
+    <div className={`min-h-screen bg-surface-50 px-5 sm:px-6 pt-12 pb-28 sm:pt-8 sm:pb-28 max-w-md mx-auto ${rtl ? 'text-right' : 'text-left'}`} dir={rtl ? 'rtl' : 'ltr'}>
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -618,17 +618,16 @@ const { data: upcoming } = await supabase
         </div>
       )}
 
-      {/* Bottom Actions */}
-      <div className="border-t border-surface-200 pt-5 mt-2 space-y-1.5">
-        {!isSick && (
+      {/* Krank melden — Abmelden ist in den Einstellungen-Tab umgezogen
+          (EmployeeSettings.tsx), da eine echte Bottom-Tab-Bar jetzt den
+          App-Fuss übernimmt. */}
+      {!isSick && (
+        <div className="border-t border-surface-200 pt-5 mt-2">
           <button onClick={onSickLeave} className="w-full flex items-center justify-center gap-2 text-sm text-danger-500 hover:bg-danger-50 transition-colors py-3.5 rounded-xl font-semibold">
             <Heart size={16} /> {t('sickLeave')}
           </button>
-        )}
-<button onClick={signOut} className="w-full flex items-center justify-center gap-2 text-sm text-ink-500 hover:bg-surface-100 transition-colors py-3.5 rounded-xl font-medium">
-          <LogOut size={16} /> {t('logOut')}
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Check-in Flow Modal */}
       {showCheckInFlow && todayAssignment && (

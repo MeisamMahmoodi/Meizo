@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LangProvider, useLang } from './hooks/useLang';
 import { ToastProvider } from './components/shared/Toast';
 import { OwnerLayout } from './components/owner/OwnerLayout';
+import { BottomTabBar, type EmployeeTab } from './components/employee/BottomTabBar';
 import { supabase } from './lib/supabase';
 import { AndroidInstallBanner } from './components/shared/AndroidInstallBanner';
 import { IosInstallButton } from './components/shared/IosInstallGuide';
@@ -25,6 +26,8 @@ const Settings = lazy(() => import('./pages/owner/Settings').then(m => ({ defaul
 const Impressum = lazy(() => import('./pages/owner/Impressum').then(m => ({ default: m.Impressum })));
 const Datenschutz = lazy(() => import('./pages/owner/Datenschutz').then(m => ({ default: m.Datenschutz })));
 const EmployeeHome = lazy(() => import('./pages/employee/EmployeeHome').then(m => ({ default: m.EmployeeHome })));
+const EmployeeHours = lazy(() => import('./pages/employee/EmployeeHours').then(m => ({ default: m.EmployeeHours })));
+const EmployeeSettings = lazy(() => import('./pages/employee/EmployeeSettings').then(m => ({ default: m.EmployeeSettings })));
 const SickLeave = lazy(() => import('./pages/employee/SickLeave').then(m => ({ default: m.SickLeave })));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const Pricing = lazy(() => import('./pages/Pricing').then(m => ({ default: m.Pricing })));
@@ -73,16 +76,29 @@ function OwnerApp({ company, onCompanyRefresh }: { company: Company & { paid_unt
 
 function EmployeeApp() {
   const [screen, setScreen] = useState<'home' | 'sick'>('home');
+  const [tab, setTab] = useState<EmployeeTab>('home');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  return (
-    <Suspense fallback={<PageLoader />}>
-      {screen === 'sick' ? (
+  // Krankmeldung ist ein fokussierter Vollbild-Ablauf, kein vierter Tab —
+  // deshalb eigener "screen"-State statt Teil von "tab", und die Tab-Bar
+  // wird waehrenddessen ausgeblendet.
+  if (screen === 'sick') {
+    return (
+      <Suspense fallback={<PageLoader />}>
         <SickLeave onBack={() => setScreen('home')} onComplete={() => { setScreen('home'); setRefreshKey(k => k + 1); }} />
-      ) : (
-        <EmployeeHome key={refreshKey} onSickLeave={() => setScreen('sick')} />
-      )}
-    </Suspense>
+      </Suspense>
+    );
+  }
+
+  return (
+    <>
+      <Suspense fallback={<PageLoader />}>
+        {tab === 'home' && <EmployeeHome key={refreshKey} onSickLeave={() => setScreen('sick')} />}
+        {tab === 'hours' && <EmployeeHours />}
+        {tab === 'settings' && <EmployeeSettings />}
+      </Suspense>
+      <BottomTabBar active={tab} onChange={setTab} />
+    </>
   );
 }
 
