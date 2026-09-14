@@ -74,13 +74,13 @@ export function Sidebar({ active, onNavigate, ownerName }: SidebarProps) {
             >
               <div
                 className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-colors duration-200 ${
-                  isActive ? 'bg-brand-500/[0.16]' : ''
+                  isActive ? 'bg-white/[0.12]' : ''
                 }`}
               >
                 <item.icon
                   size={17}
                   strokeWidth={isActive ? 2 : 1.5}
-                  className={isActive ? 'text-brand-400' : ''}
+                  className={isActive ? 'text-white' : ''}
                 />
               </div>
               <span>{item.label}</span>
