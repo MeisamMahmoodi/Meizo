@@ -173,6 +173,7 @@ export type TranslationKeys = {
   currentPassword: string;
   currentPasswordWrong: string;
   passwordChanged: string;
+  noAssignmentsThisMonth: string;
 };
 
 const translations: Record<Lang, TranslationKeys> = {
@@ -316,6 +317,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Aktuelles Passwort',
     currentPasswordWrong: 'Aktuelles Passwort ist falsch',
     passwordChanged: 'Passwort wurde geändert',
+    noAssignmentsThisMonth: 'Keine Einsätze in diesem Monat',
   },
   ro: {
     goodMorning: 'Buna dimineata',
@@ -457,6 +459,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Parola actuală',
     currentPasswordWrong: 'Parola actuală este greșită',
     passwordChanged: 'Parola a fost schimbată',
+    noAssignmentsThisMonth: 'Nicio tură luna aceasta',
   },
   ar: {
     goodMorning: 'صباح الخير',
@@ -598,6 +601,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'كلمة المرور الحالية',
     currentPasswordWrong: 'كلمة المرور الحالية غير صحيحة',
     passwordChanged: 'تم تغيير كلمة المرور',
+    noAssignmentsThisMonth: 'لا توجد ورديات هذا الشهر',
   },
   pl: {
     goodMorning: 'Dzien dobry',
@@ -739,6 +743,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Obecne hasło',
     currentPasswordWrong: 'Obecne hasło jest nieprawidłowe',
     passwordChanged: 'Hasło zostało zmienione',
+    noAssignmentsThisMonth: 'Brak zmian w tym miesiącu',
   },
   en: {
     goodMorning: 'Good morning',
@@ -880,6 +885,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Current password',
     currentPasswordWrong: 'Current password is incorrect',
     passwordChanged: 'Password changed',
+    noAssignmentsThisMonth: 'No shifts this month',
   },
   uk: {
     goodMorning: 'Доброго ранку',
@@ -1021,6 +1027,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Поточний пароль',
     currentPasswordWrong: 'Поточний пароль невірний',
     passwordChanged: 'Пароль змінено',
+    noAssignmentsThisMonth: 'Немає завдань у цьому місяці',
   },
   tr: {
     goodMorning: 'Günaydın',
@@ -1162,6 +1169,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Mevcut şifre',
     currentPasswordWrong: 'Mevcut şifre yanlış',
     passwordChanged: 'Şifre değiştirildi',
+    noAssignmentsThisMonth: 'Bu ay vardiya yok',
   },
   bg: {
     goodMorning: 'Добро утро',
@@ -1303,6 +1311,7 @@ const translations: Record<Lang, TranslationKeys> = {
     currentPassword: 'Текуща парола',
     currentPasswordWrong: 'Текущата парола е грешна',
     passwordChanged: 'Паролата е променена',
+    noAssignmentsThisMonth: 'Няма смени този месец',
   },
 };
 
