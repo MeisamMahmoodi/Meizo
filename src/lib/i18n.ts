@@ -169,6 +169,10 @@ export type TranslationKeys = {
   tabHours: string;
   tabSettings: string;
   hoursComingSoon: string;
+  changePassword: string;
+  currentPassword: string;
+  currentPasswordWrong: string;
+  passwordChanged: string;
 };
 
 const translations: Record<Lang, TranslationKeys> = {
@@ -308,6 +312,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Stunden',
     tabSettings: 'Einstellungen',
     hoursComingSoon: 'Deine gearbeiteten Stunden werden hier bald angezeigt.',
+    changePassword: 'Passwort ändern',
+    currentPassword: 'Aktuelles Passwort',
+    currentPasswordWrong: 'Aktuelles Passwort ist falsch',
+    passwordChanged: 'Passwort wurde geändert',
   },
   ro: {
     goodMorning: 'Buna dimineata',
@@ -445,6 +453,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Ore',
     tabSettings: 'Setări',
     hoursComingSoon: 'Orele tale lucrate vor apărea aici în curând.',
+    changePassword: 'Schimbă parola',
+    currentPassword: 'Parola actuală',
+    currentPasswordWrong: 'Parola actuală este greșită',
+    passwordChanged: 'Parola a fost schimbată',
   },
   ar: {
     goodMorning: 'صباح الخير',
@@ -582,6 +594,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'الساعات',
     tabSettings: 'الإعدادات',
     hoursComingSoon: 'ستظهر ساعات عملك هنا قريبًا.',
+    changePassword: 'تغيير كلمة المرور',
+    currentPassword: 'كلمة المرور الحالية',
+    currentPasswordWrong: 'كلمة المرور الحالية غير صحيحة',
+    passwordChanged: 'تم تغيير كلمة المرور',
   },
   pl: {
     goodMorning: 'Dzien dobry',
@@ -719,6 +735,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Godziny',
     tabSettings: 'Ustawienia',
     hoursComingSoon: 'Twoje przepracowane godziny pojawią się tutaj wkrótce.',
+    changePassword: 'Zmień hasło',
+    currentPassword: 'Obecne hasło',
+    currentPasswordWrong: 'Obecne hasło jest nieprawidłowe',
+    passwordChanged: 'Hasło zostało zmienione',
   },
   en: {
     goodMorning: 'Good morning',
@@ -856,6 +876,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Hours',
     tabSettings: 'Settings',
     hoursComingSoon: 'Your worked hours will appear here soon.',
+    changePassword: 'Change password',
+    currentPassword: 'Current password',
+    currentPasswordWrong: 'Current password is incorrect',
+    passwordChanged: 'Password changed',
   },
   uk: {
     goodMorning: 'Доброго ранку',
@@ -993,6 +1017,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Години',
     tabSettings: 'Налаштування',
     hoursComingSoon: 'Ваші відпрацьовані години з\'являться тут незабаром.',
+    changePassword: 'Змінити пароль',
+    currentPassword: 'Поточний пароль',
+    currentPasswordWrong: 'Поточний пароль невірний',
+    passwordChanged: 'Пароль змінено',
   },
   tr: {
     goodMorning: 'Günaydın',
@@ -1130,6 +1158,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Saatler',
     tabSettings: 'Ayarlar',
     hoursComingSoon: 'Çalıştığın saatler yakında burada görünecek.',
+    changePassword: 'Şifreyi değiştir',
+    currentPassword: 'Mevcut şifre',
+    currentPasswordWrong: 'Mevcut şifre yanlış',
+    passwordChanged: 'Şifre değiştirildi',
   },
   bg: {
     goodMorning: 'Добро утро',
@@ -1267,6 +1299,10 @@ const translations: Record<Lang, TranslationKeys> = {
     tabHours: 'Часове',
     tabSettings: 'Настройки',
     hoursComingSoon: 'Отработените ти часове ще се показват тук скоро.',
+    changePassword: 'Смяна на паролата',
+    currentPassword: 'Текуща парола',
+    currentPasswordWrong: 'Текущата парола е грешна',
+    passwordChanged: 'Паролата е променена',
   },
 };
 

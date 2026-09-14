@@ -1,21 +1,120 @@
-import { useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { LogOut, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useLang } from '../../hooks/useLang';
+import { useToast } from '../../components/shared/Toast';
 import { Modal } from '../../components/shared/Modal';
 
-// Einstellungen-Tab der Mitarbeiter-App. Enthaelt aktuell nur "Abmelden"
-// (aus dem alten "Bottom Actions"-Block in EmployeeHome hierher verschoben).
-// Naechster Schritt laut Plan: Passwort aendern kommt hier ebenfalls rein.
+// Einstellungen-Tab der Mitarbeiter-App. Enthaelt "Passwort aendern" und
+// "Abmelden" (Abmelden kam aus dem alten "Bottom Actions"-Block in
+// EmployeeHome hierher).
 export function EmployeeSettings() {
-  const { signOut } = useAuth();
+  const { user, signIn, changePassword, signOut } = useAuth();
   const { t, rtl } = useLang();
+  const { addToast } = useToast();
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (newPassword.length < 6) {
+      setPasswordError(t('passwordMinLength'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError(t('passwordsDontMatch'));
+      return;
+    }
+
+    setSavingPassword(true);
+    // Wer eingeloggt ist, kennt nicht zwangslaeufig auch das Passwort (z.B.
+    // ein liegen gelassenes, entsperrtes Handy) — deshalb erst das aktuelle
+    // Passwort verifizieren, bevor es geaendert wird.
+    const { error: verifyError } = await signIn(user?.email ?? '', currentPassword);
+    if (verifyError) {
+      setSavingPassword(false);
+      setPasswordError(t('currentPasswordWrong'));
+      return;
+    }
+
+    const { error: changeError } = await changePassword(newPassword);
+    setSavingPassword(false);
+    if (changeError) {
+      setPasswordError(changeError);
+      return;
+    }
+
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    addToast(t('passwordChanged'), 'success');
+  };
 
   return (
     <div className={`min-h-screen bg-surface-50 px-5 sm:px-6 pt-12 pb-24 max-w-md mx-auto ${rtl ? 'text-right' : 'text-left'}`} dir={rtl ? 'rtl' : 'ltr'}>
       <h1 className="text-xl font-bold text-ink-900 tracking-tight mb-6">{t('tabSettings')}</h1>
 
+      {/* Passwort aendern */}
+      <div className="card p-5 mb-4">
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink-900 mb-4">
+          <KeyRound size={16} className="text-ink-300" /> {t('changePassword')}
+        </p>
+        <form onSubmit={handleChangePassword} className="space-y-3">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            placeholder={t('currentPassword')}
+            value={currentPassword}
+            onChange={e => setCurrentPassword(e.target.value)}
+            className="input-field"
+            autoComplete="current-password"
+          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder={t('newPassword')}
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="input-field !pr-10"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className={`absolute top-1/2 -translate-y-1/2 text-ink-300 hover:text-ink-700 transition-colors ${rtl ? 'left-3.5' : 'right-3.5'}`}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <input
+            type={showPassword ? 'text' : 'password'}
+            placeholder={t('confirmPassword')}
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            className="input-field"
+            autoComplete="new-password"
+          />
+
+          {passwordError && <p className="text-sm text-danger-500 font-medium">{passwordError}</p>}
+
+          <button
+            type="submit"
+            disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
+            className="btn-primary w-full py-3"
+          >
+            {savingPassword ? t('saving') : t('savePassword')}
+          </button>
+        </form>
+      </div>
+
+      {/* Abmelden */}
       <div className="card divide-y divide-surface-200">
         <button
           onClick={() => setLogoutConfirm(true)}
