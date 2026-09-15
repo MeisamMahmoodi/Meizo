@@ -591,8 +591,8 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="card p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#EFF6FF' }}>
-              <Euro size={20} className="text-[#2563EB]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <Euro size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Gesamtkosten</p>
           </div>
@@ -601,8 +601,8 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
         </div>
         <div className="card p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#F0FDF4' }}>
-              <Clock size={20} className="text-[#16A34A]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <Clock size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Gearbeitet</p>
           </div>
@@ -611,8 +611,8 @@ export function Payroll({ company, refreshKey, onRefresh }: PayrollProps) {
         </div>
         <div className="card p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#F5F3FF' }}>
-              <CalendarDays size={20} className="text-[#7C3AED]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <CalendarDays size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Erwartet</p>
           </div>

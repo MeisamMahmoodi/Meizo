@@ -260,8 +260,8 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="card p-5">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#EFF6FF' }}>
-              <Clock size={20} className="text-[#2563EB]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <Clock size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Eingecheckt</p>
           </div>
@@ -270,8 +270,8 @@ export function Timestamps({ company, refreshKey }: TimestampsProps) {
         </div>
         <div className="card p-5">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="stat-icon" style={{ backgroundColor: '#F0FDF4' }}>
-              <Check size={20} className="text-[#16A34A]" />
+            <div className="stat-icon" style={{ backgroundColor: '#F1F5F9' }}>
+              <Check size={20} className="text-[#0F172A]" />
             </div>
             <p className="section-label">Fertig</p>
           </div>
