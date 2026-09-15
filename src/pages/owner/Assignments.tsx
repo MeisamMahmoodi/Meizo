@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { DragEvent, Dispatch, SetStateAction } from 'react';
-import { Plus, Calendar, MapPin, Clock, Check, X, AlertTriangle, ChevronLeft, ChevronRight, Trash2, Repeat, CalendarDays } from 'lucide-react';
+import { Plus, Calendar, MapPin, Clock, Check, X, AlertTriangle, ChevronLeft, ChevronRight, Trash2, Repeat, CalendarDays, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Modal } from '../../components/shared/Modal';
 import { Avatar } from '../../components/shared/Avatar';
@@ -59,6 +59,16 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
   const [removeConfirm, setRemoveConfirm] = useState<AssignmentWithDetails | null>(null);
   const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<AssignmentWithDetails[] | null>(null);
   const [deleteSeriesConfirm, setDeleteSeriesConfirm] = useState<{ recurringOrderId: string; propertyName: string } | null>(null);
+
+  // Bestehenden Einsatz bearbeiten (Mitarbeiter/Datum/Uhrzeit) — vorher gab
+  // es dafuer keine UI, ein einmal erstellter Einsatz liess sich nur noch
+  // einchecken oder komplett entfernen, nie mehr aendern.
+  const [editAssignment, setEditAssignment] = useState<AssignmentWithDetails | null>(null);
+  const [editEmployeeId, setEditEmployeeId] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editTimeFrom, setEditTimeFrom] = useState('');
+  const [editTimeTo, setEditTimeTo] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   // Wiederkehrender Auftrag
   const [orderType, setOrderType] = useState<'single' | 'recurring'>('single');
@@ -393,6 +403,76 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
     onRefresh();
   };
 
+  const openEditDialog = (a: AssignmentWithDetails) => {
+    setEditAssignment(a);
+    setEditEmployeeId(a.employee_id);
+    setEditDate(a.date);
+    setEditTimeFrom(a.time_from ?? '');
+    setEditTimeTo(a.time_to ?? '');
+  };
+
+  const handleEditAssignment = async () => {
+    if (!editAssignment || !editEmployeeId || !editDate) {
+      addToast('Bitte alle Felder ausfüllen', 'error');
+      return;
+    }
+
+    const prop = editAssignment.property;
+    const timeFrom = editTimeFrom || null;
+    const timeTo = editTimeTo || null;
+    const resolvedFrom = timeFrom ?? prop?.time_from ?? null;
+    const resolvedTo = timeTo ?? prop?.time_to ?? null;
+
+    setEditSaving(true);
+
+    // Gleicher Doppel-Einsatz-Check wie beim Erstellen, nur diesmal unter
+    // Ausschluss des Einsatzes, der gerade bearbeitet wird.
+    const { data: existingForDate, error: dupCheckErr } = await supabase
+      .from('assignments')
+      .select('id, employee_id, time_from, time_to')
+      .eq('property_id', editAssignment.property_id)
+      .eq('date', editDate)
+      .eq('employee_id', editEmployeeId)
+      .neq('id', editAssignment.id);
+    if (dupCheckErr) {
+      addToast('Fehler beim Prüfen auf Doppel-Einsätze', 'error');
+      setEditSaving(false);
+      return;
+    }
+    const duplicate = (existingForDate || []).some(a =>
+      (a.time_from ?? prop?.time_from ?? null) === resolvedFrom &&
+      (a.time_to ?? prop?.time_to ?? null) === resolvedTo
+    );
+    if (duplicate) {
+      addToast('Für diesen Mitarbeiter existiert bereits ein Einsatz zu dieser Zeit', 'error');
+      setEditSaving(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('assignments')
+      .update({ employee_id: editEmployeeId, date: editDate, time_from: timeFrom, time_to: timeTo })
+      .eq('id', editAssignment.id);
+
+    if (error) { addToast('Fehler beim Speichern', 'error'); setEditSaving(false); return; }
+
+    const dateLabel = new Date(editDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeLabel = `${formatTime(resolvedFrom)} – ${formatTime(resolvedTo)} Uhr`;
+    const employeeChanged = editEmployeeId !== editAssignment.employee_id;
+
+    if (employeeChanged) {
+      sendPushToEmployee(editAssignment.employee_id, 'Einsatz abgesagt', `${prop.name} am ${dateLabel} wurde dir nicht mehr zugewiesen`, { type: 'info' });
+      sendPushToEmployee(editEmployeeId, `Neuer Einsatz: ${prop.name}`, `${dateLabel}, ${timeLabel}`, { type: 'new_assignment' });
+    } else {
+      sendPushToEmployee(editEmployeeId, `Einsatz geändert: ${prop.name}`, `${dateLabel}, ${timeLabel}`, { type: 'info' });
+    }
+
+    setEditSaving(false);
+    setEditAssignment(null);
+    onRefresh();
+    addToast('Einsatz aktualisiert');
+  };
+
   const toggleEmployee = (empId: string) => {
     setNewEmployeeIds(prev => prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]);
   };
@@ -614,6 +694,7 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
                         {a.status === 'assigned' && !isSick && (
                           <button onClick={() => handleStatusChange(a, 'checked_in')} className="p-1.5 rounded-lg hover:bg-[#F0FDF4] transition-colors text-[#22C55E]" title="Einchecken"><Check size={16} /></button>
                         )}
+                        <button onClick={() => openEditDialog(a)} className="p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors text-[#64748B]" title="Bearbeiten"><Pencil size={15} /></button>
                         <button onClick={() => setRemoveConfirm(a)} className="p-1.5 rounded-lg hover:bg-[#FEF2F2] transition-colors text-[#F87171]" title="Entfernen"><X size={16} /></button>
                       </div>
                     </div>
@@ -764,6 +845,45 @@ export function Assignments({ company, refreshKey, onRefresh }: AssignmentsProps
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      {/* Edit Assignment Modal */}
+      <Modal open={!!editAssignment} onClose={() => setEditAssignment(null)} width="max-w-md">
+        <div className="p-8">
+          <h2 className="text-lg font-bold text-[#0F172A] mb-1">Einsatz bearbeiten</h2>
+          {editAssignment && (
+            <p className="text-sm text-[#64748B] mb-6 flex items-center gap-1.5">
+              <MapPin size={14} className="text-[#94A3B8]" /> {editAssignment.property.name}
+            </p>
+          )}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Datum</label>
+              <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="input-field" />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1"><label className="block text-sm font-medium text-[#0F172A] mb-1.5">Uhrzeit von</label><input type="time" value={editTimeFrom} onChange={e => setEditTimeFrom(e.target.value)} className="input-field" /></div>
+              <div className="flex-1"><label className="block text-sm font-medium text-[#0F172A] mb-1.5">Uhrzeit bis</label><input type="time" value={editTimeTo} onChange={e => setEditTimeTo(e.target.value)} className="input-field" /></div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Mitarbeiter</label>
+              <select value={editEmployeeId} onChange={e => setEditEmployeeId(e.target.value)} className="input-field">
+                {editAssignment && !activeEmployees.some(e => e.id === editAssignment.employee_id) && (
+                  <option value={editAssignment.employee_id}>{editAssignment.employee.first_name} {editAssignment.employee.last_name} (inaktiv)</option>
+                )}
+                {activeEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-8">
+            <button onClick={() => setEditAssignment(null)} className="btn-ghost">Abbrechen</button>
+            <button onClick={handleEditAssignment} disabled={editSaving || !editEmployeeId || !editDate} className="btn-primary">
+              {editSaving ? 'Wird gespeichert...' : 'Speichern'}
+            </button>
+          </div>
         </div>
       </Modal>
 
