@@ -24,7 +24,15 @@ export function OwnerLayout({ company, children, activePage, onNavigate, onCompa
   return (
     <div className="min-h-screen bg-[#F0F1F3]">
       <Sidebar active={activePage} onNavigate={onNavigate} ownerName={company.owner_name} />
-      <main className="lg:ml-60 lg:pt-0 p-4 sm:p-6 lg:p-8" style={{ paddingTop: 'calc(3.5rem + max(0, env(safe-area-inset-top)))' }}>
+      {/* Der Top-Abstand kam vorher aus einem inline style, das *immer*
+          galt (fuer den fixen Mobile-Header + Notch gedacht) — die Klasse
+          lg:pt-0 daneben sollte das am Desktop zuruecksetzen, konnte es
+          aber nie, weil ein inline style jede Klasse schlaegt. Jede
+          Owner-Seite stand dadurch am Desktop zu dicht am Fensterrand.
+          Jetzt steuert eine reine pt-Klasse das Ganze, damit lg: den
+          mobilen Wert sauber ueberschreiben kann und der Desktop-Wert
+          spuerbar mehr Luft bekommt. */}
+      <main className="lg:ml-60 px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 lg:pb-8 pt-[calc(3.5rem+max(0px,env(safe-area-inset-top)))] lg:pt-10">
         {children({ company, refreshKey, onRefresh, onNavigate })}
       </main>
     </div>
