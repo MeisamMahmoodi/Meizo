@@ -70,6 +70,12 @@ async function callAdminAction(action: string, payload: Record<string, unknown>,
 
 // ── Create Owner Modal ───────────────────────────────────────────────────────
 function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; onCreated: () => void; token?: string }) {
+  // Kontotyp: 'trial' ist der bisherige Ablauf (Testmonat, laeuft nach
+  // trial_ends_at ab, Bezahlung wird spaeter faellig). 'free' ist neu: ein
+  // ganz normales Konto, das nie zahlen muss — dafuer wird paid_until
+  // einfach weit in die Zukunft gesetzt, dieselbe "paidActive"-Pruefung in
+  // App.tsx greift dann dauerhaft, ohne dass die Paywall je aufploppt.
+  const [accountType, setAccountType] = useState<'trial' | 'free'>('trial');
   const [form, setForm] = useState({
     owner_name: '', company_name: '', email: '', password: '',
     contract_start: toLocalDateStr(new Date()),
@@ -93,14 +99,25 @@ function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; 
     if (form.password.length < 6) { setError('Passwort muss mindestens 6 Zeichen haben.'); return; }
     setLoading(true);
     try {
+      let paidUntilIso: string | undefined;
+      let trialEndsAtIso: string | undefined;
+      if (accountType === 'free') {
+        const farFuture = new Date();
+        farFuture.setFullYear(farFuture.getFullYear() + 100);
+        paidUntilIso = farFuture.toISOString();
+        trialEndsAtIso = undefined;
+      } else {
+        paidUntilIso = form.paid_until ? new Date(form.paid_until).toISOString() : undefined;
+        trialEndsAtIso = form.trial_ends_at || undefined;
+      }
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-owner-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           owner_name: form.owner_name, company_name: form.company_name, email: form.email, password: form.password,
           contract_start: form.contract_start ? new Date(form.contract_start).toISOString() : undefined,
-          paid_until: form.paid_until ? new Date(form.paid_until).toISOString() : undefined,
-          trial_ends_at: form.trial_ends_at || undefined,
+          paid_until: paidUntilIso,
+          trial_ends_at: trialEndsAtIso,
         }),
       });
       const json = await res.json();
@@ -113,6 +130,24 @@ function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; 
   return (
     <Modal title="Neues Unternehmen anlegen" onClose={onClose}>
       <form onSubmit={submit} className="px-6 py-5 space-y-4">
+        <Field label="Kontotyp">
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setAccountType('trial')}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${accountType === 'trial' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+            >
+              Testmonat
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType('free')}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${accountType === 'free' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+            >
+              Kostenloses Konto
+            </button>
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Name des Chefs *"><input value={form.owner_name} onChange={set('owner_name')} className="input-field text-sm" placeholder="Max Mustermann" /></Field>
           <Field label="Firmenname *"><input value={form.company_name} onChange={set('company_name')} className="input-field text-sm" placeholder="Reinigungs GmbH" /></Field>
@@ -128,13 +163,24 @@ function CreateOwnerModal({ onClose, onCreated, token }: { onClose: () => void; 
             </button>
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Vertragsbeginn"><input type="date" value={form.contract_start} onChange={set('contract_start')} className="input-field text-sm" /></Field>
-          <Field label="Bezahlt bis"><input type="date" value={form.paid_until} onChange={set('paid_until')} className="input-field text-sm" /></Field>
-        </div>
-        <Field label="Testzeitraum endet am">
-          <input type="date" value={form.trial_ends_at} onChange={set('trial_ends_at')} className="input-field text-sm" />
-        </Field>
+        {accountType === 'trial' ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Vertragsbeginn"><input type="date" value={form.contract_start} onChange={set('contract_start')} className="input-field text-sm" /></Field>
+              <Field label="Bezahlt bis"><input type="date" value={form.paid_until} onChange={set('paid_until')} className="input-field text-sm" /></Field>
+            </div>
+            <Field label="Testzeitraum endet am">
+              <input type="date" value={form.trial_ends_at} onChange={set('trial_ends_at')} className="input-field text-sm" />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="Vertragsbeginn"><input type="date" value={form.contract_start} onChange={set('contract_start')} className="input-field text-sm" /></Field>
+            <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2.5 leading-relaxed">
+              Läuft nie ab und wird nie zur Zahlung fällig — keine Paywall, kein Testzeitraum-Countdown.
+            </p>
+          </>
+        )}
         {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Abbrechen</button>
