@@ -7,11 +7,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// Passwort kommt aus einem Secret (supabase secrets set DEMO_USERS_PASSWORD=...),
+// nicht mehr fest im Code. Ohne Secret (min. 12 Zeichen) bleibt die Funktion gesperrt.
+const DEMO_PASSWORD = Deno.env.get("DEMO_USERS_PASSWORD") ?? "";
+
 const DEMO_USERS = [
-  { email: "chef@meizo.demo",   password: "demo1234", role: "owner",    employeeEmail: null },
-  { email: "maria@meizo.demo",  password: "demo1234", role: "employee", employeeEmail: "maria@meizo.demo" },
-  { email: "stefan@meizo.demo", password: "demo1234", role: "employee", employeeEmail: "stefan@meizo.demo" },
-  { email: "jana@meizo.demo",   password: "demo1234", role: "employee", employeeEmail: "jana@meizo.demo" },
+  { email: "chef@meizo.demo",   password: DEMO_PASSWORD, role: "owner",    employeeEmail: null },
+  { email: "maria@meizo.demo",  password: DEMO_PASSWORD, role: "employee", employeeEmail: "maria@meizo.demo" },
+  { email: "stefan@meizo.demo", password: DEMO_PASSWORD, role: "employee", employeeEmail: "stefan@meizo.demo" },
+  { email: "jana@meizo.demo",   password: DEMO_PASSWORD, role: "employee", employeeEmail: "jana@meizo.demo" },
 ];
 
 Deno.serve(async (req: Request) => {
@@ -53,6 +57,13 @@ Deno.serve(async (req: Request) => {
     if (!profile || profile.role !== "admin") {
       return new Response(JSON.stringify({ error: "Nur Admins dürfen diese Aktion ausführen" }), {
         status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (DEMO_PASSWORD.length < 12) {
+      return new Response(JSON.stringify({ error: "DEMO_USERS_PASSWORD (min. 12 Zeichen) ist nicht gesetzt" }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -22,6 +22,18 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // --- Autorisierung -------------------------------------------------
+    // Vorher: ohne Auth-Pruefung nutzbar. Mit dem oeffentlichen anon-Key
+    // konnte jeder beliebige Push-Nachrichten an jeden Mitarbeiter schicken
+    // (Phishing/Spam). Jetzt erlaubt:
+    //   1. interne Aufrufe mit dem Service-Role-Key (check-in-reminder, Cron)
+    //   2. eingeloggte Admins
+    //   3. eingeloggte Owner, aber nur fuer Mitarbeiter ihrer eigenen Firma
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isInternalCall = serviceKey !== "" && bearer === serviceKey;
+
     const { employee_id, title, body, data } = await req.json() as {
       employee_id: string;
       title: string;
@@ -34,6 +46,50 @@ Deno.serve(async (req: Request) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Laengen begrenzen, damit die Funktion nicht als Spam-Relay taugt
+    if (title.length > 120 || body.length > 500) {
+      return new Response(JSON.stringify({ error: "title/body zu lang" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!isInternalCall) {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Nicht autorisiert" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("profiles").select("role").eq("id", user.id).maybeSingle();
+
+      let allowed = profile?.role === "admin";
+      if (!allowed && profile?.role === "owner") {
+        const { data: target } = await supabaseAdmin
+          .from("employees").select("company_id").eq("id", employee_id).maybeSingle();
+        const { data: company } = target
+          ? await supabaseAdmin.from("companies").select("id")
+              .eq("id", target.company_id).eq("owner_id", user.id).maybeSingle()
+          : { data: null };
+        allowed = !!company;
+      }
+
+      if (!allowed) {
+        return new Response(JSON.stringify({ error: "Keine Berechtigung" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Fetch push subscription
